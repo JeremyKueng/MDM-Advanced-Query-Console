@@ -1,0 +1,1500 @@
+{
+  "version": 1,
+  "scope": {
+    "logic": "AND",
+    "conditions": [
+      {
+        "field": "物料状态",
+        "op": "eq",
+        "value": "有效"
+      },
+      {
+        "field": "成品类型",
+        "op": "notContains",
+        "value": "进口"
+      },
+      {
+        "field": "物料编码",
+        "op": "notPrefix",
+        "value": "1900"
+      }
+    ]
+  },
+  "rules": [
+    {
+      "id": "pdf-ecom",
+      "no": 1,
+      "title": "电商一致性",
+      "description": "是否电商=是 的产品须至少维护一个条码（基准条码/外包装条码/小包条码/手抽中袋条码），保证电商上架信息完整。",
+      "enabled": true,
+      "scope": {
+        "logic": "AND",
+        "conditions": [
+          {
+            "field": "是否电商",
+            "op": "eq",
+            "value": "是"
+          }
+        ]
+      },
+      "checks": [
+        {
+          "id": "c1",
+          "enabled": true,
+          "message": "条码缺失",
+          "code": "PFI",
+          "when": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "field": "基准条码",
+                "op": "empty"
+              },
+              {
+                "field": "外包装条形码（选择组织）",
+                "op": "empty"
+              },
+              {
+                "field": "小包/袋/盒产品条码",
+                "op": "empty"
+              },
+              {
+                "field": "手抽/中袋条形码",
+                "op": "empty"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "pdf-weight",
+      "no": 2,
+      "title": "净重 / 不含赠品净重 / 毛重",
+      "description": "三项均不得为空；不含赠品净重 ≤ 净重；净重 < 毛重。为空计必填缺失（提示），比较矛盾与非数字计阻断。",
+      "enabled": true,
+      "scope": {
+        "logic": "AND",
+        "conditions": []
+      },
+      "checks": [
+        {
+          "id": "c1",
+          "enabled": true,
+          "message": "净重",
+          "code": "PFM",
+          "when": {
+            "field": "净重",
+            "op": "empty"
+          }
+        },
+        {
+          "id": "c2",
+          "enabled": true,
+          "message": "净重",
+          "code": "PFN",
+          "when": {
+            "field": "净重",
+            "op": "junk"
+          }
+        },
+        {
+          "id": "c3",
+          "enabled": true,
+          "message": "不含赠品净重",
+          "code": "PFM",
+          "when": {
+            "field": "不含赠品净重",
+            "op": "empty"
+          }
+        },
+        {
+          "id": "c4",
+          "enabled": true,
+          "message": "不含赠品净重",
+          "code": "PFN",
+          "when": {
+            "field": "不含赠品净重",
+            "op": "junk"
+          }
+        },
+        {
+          "id": "c5",
+          "enabled": true,
+          "message": "毛重",
+          "code": "PFM",
+          "when": {
+            "field": "毛重",
+            "op": "empty"
+          }
+        },
+        {
+          "id": "c6",
+          "enabled": true,
+          "message": "毛重",
+          "code": "PFN",
+          "when": {
+            "field": "毛重",
+            "op": "junk"
+          }
+        },
+        {
+          "id": "c7",
+          "enabled": true,
+          "message": "不含赠品净重>净重",
+          "code": "PFC",
+          "when": {
+            "field": "不含赠品净重",
+            "op": "gt",
+            "otherField": "净重",
+            "epsilon": 1e-09
+          }
+        },
+        {
+          "id": "c8",
+          "enabled": true,
+          "message": "净重≥毛重",
+          "code": "PFC",
+          "when": {
+            "field": "净重",
+            "op": "gte",
+            "otherField": "毛重",
+            "epsilon": 1e-09
+          }
+        },
+        {
+          "id": "c9",
+          "enabled": true,
+          "message": "不含赠品净重≤0",
+          "code": "PFC",
+          "when": {
+            "field": "不含赠品净重",
+            "op": "lte",
+            "value": 0
+          }
+        },
+        {
+          "id": "c10",
+          "enabled": true,
+          "message": "毛重≤0",
+          "code": "PFC",
+          "when": {
+            "field": "毛重",
+            "op": "lte",
+            "value": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "pdf-quant",
+      "no": 3,
+      "title": "成品定量",
+      "description": "排除制造类别=其他；其余不得为空、不得为非数字、不得 ≤0。",
+      "enabled": true,
+      "scope": {
+        "logic": "AND",
+        "conditions": [
+          {
+            "field": "制造类别",
+            "op": "neq",
+            "value": "其他"
+          }
+        ]
+      },
+      "checks": [
+        {
+          "id": "c1",
+          "enabled": true,
+          "message": "成品定量",
+          "code": "PFM",
+          "when": {
+            "field": "成品定量",
+            "op": "empty"
+          }
+        },
+        {
+          "id": "c2",
+          "enabled": true,
+          "message": "成品定量",
+          "code": "PFN",
+          "when": {
+            "logic": "OR",
+            "conditions": [
+              {
+                "field": "成品定量",
+                "op": "junk"
+              },
+              {
+                "field": "成品定量",
+                "op": "lte",
+                "value": 0
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "pdf-wetnet",
+      "no": 4,
+      "title": "不含液成品净重",
+      "description": "湿巾（品类三级含湿巾或库存类别为成品.湿纸巾）不得为空且须为数字；不含液成品净重 < 净重(含液)、< 不含赠品净重；湿巾组合装不适用。非湿巾按规范应为空，但 MDM 尚未屏蔽其他品类填写（排期优化中），仅提示不阻断。",
+      "enabled": true,
+      "scope": {
+        "logic": "AND",
+        "conditions": []
+      },
+      "checks": [
+        {
+          "id": "c1",
+          "enabled": true,
+          "message": "不含液成品净重",
+          "code": "PFM",
+          "when": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "logic": "OR",
+                "conditions": [
+                  {
+                    "field": "品类三级",
+                    "op": "contains",
+                    "value": "湿巾"
+                  },
+                  {
+                    "field": "物料库存类别",
+                    "op": "contains",
+                    "value": "湿纸巾"
+                  }
+                ]
+              },
+              {
+                "logic": "NOT",
+                "conditions": [
+                  {
+                    "logic": "OR",
+                    "conditions": [
+                      {
+                        "field": "物料库存类别",
+                        "op": "contains",
+                        "value": "组合"
+                      },
+                      {
+                        "field": "是否组合装",
+                        "op": "eq",
+                        "value": "是"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "field": "不含液成品净重（kg）",
+                "op": "empty"
+              }
+            ]
+          }
+        },
+        {
+          "id": "c2",
+          "enabled": true,
+          "message": "不含液成品净重",
+          "code": "PFN",
+          "when": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "logic": "OR",
+                "conditions": [
+                  {
+                    "field": "品类三级",
+                    "op": "contains",
+                    "value": "湿巾"
+                  },
+                  {
+                    "field": "物料库存类别",
+                    "op": "contains",
+                    "value": "湿纸巾"
+                  }
+                ]
+              },
+              {
+                "logic": "NOT",
+                "conditions": [
+                  {
+                    "logic": "OR",
+                    "conditions": [
+                      {
+                        "field": "物料库存类别",
+                        "op": "contains",
+                        "value": "组合"
+                      },
+                      {
+                        "field": "是否组合装",
+                        "op": "eq",
+                        "value": "是"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "field": "不含液成品净重（kg）",
+                "op": "junk"
+              }
+            ]
+          }
+        },
+        {
+          "id": "c3",
+          "enabled": true,
+          "message": "不含液成品净重≤0",
+          "code": "PFC",
+          "when": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "logic": "OR",
+                "conditions": [
+                  {
+                    "field": "品类三级",
+                    "op": "contains",
+                    "value": "湿巾"
+                  },
+                  {
+                    "field": "物料库存类别",
+                    "op": "contains",
+                    "value": "湿纸巾"
+                  }
+                ]
+              },
+              {
+                "logic": "NOT",
+                "conditions": [
+                  {
+                    "logic": "OR",
+                    "conditions": [
+                      {
+                        "field": "物料库存类别",
+                        "op": "contains",
+                        "value": "组合"
+                      },
+                      {
+                        "field": "是否组合装",
+                        "op": "eq",
+                        "value": "是"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "field": "不含液成品净重（kg）",
+                "op": "lte",
+                "value": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "c4",
+          "enabled": true,
+          "message": "不含液成品净重≥净重",
+          "code": "PFC",
+          "when": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "logic": "OR",
+                "conditions": [
+                  {
+                    "field": "品类三级",
+                    "op": "contains",
+                    "value": "湿巾"
+                  },
+                  {
+                    "field": "物料库存类别",
+                    "op": "contains",
+                    "value": "湿纸巾"
+                  }
+                ]
+              },
+              {
+                "logic": "NOT",
+                "conditions": [
+                  {
+                    "logic": "OR",
+                    "conditions": [
+                      {
+                        "field": "物料库存类别",
+                        "op": "contains",
+                        "value": "组合"
+                      },
+                      {
+                        "field": "是否组合装",
+                        "op": "eq",
+                        "value": "是"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "field": "不含液成品净重（kg）",
+                "op": "gte",
+                "otherField": "净重",
+                "epsilon": 1e-09
+              }
+            ]
+          }
+        },
+        {
+          "id": "c5",
+          "enabled": true,
+          "message": "不含液成品净重≥不含赠品净重",
+          "code": "PFC",
+          "when": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "logic": "OR",
+                "conditions": [
+                  {
+                    "field": "品类三级",
+                    "op": "contains",
+                    "value": "湿巾"
+                  },
+                  {
+                    "field": "物料库存类别",
+                    "op": "contains",
+                    "value": "湿纸巾"
+                  }
+                ]
+              },
+              {
+                "logic": "NOT",
+                "conditions": [
+                  {
+                    "logic": "OR",
+                    "conditions": [
+                      {
+                        "field": "物料库存类别",
+                        "op": "contains",
+                        "value": "组合"
+                      },
+                      {
+                        "field": "是否组合装",
+                        "op": "eq",
+                        "value": "是"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "field": "不含液成品净重（kg）",
+                "op": "gte",
+                "otherField": "不含赠品净重",
+                "epsilon": 1e-09
+              }
+            ]
+          }
+        },
+        {
+          "id": "c6",
+          "enabled": true,
+          "message": "非湿巾已填不含液净重",
+          "code": "PFI",
+          "when": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "logic": "NOT",
+                "conditions": [
+                  {
+                    "logic": "OR",
+                    "conditions": [
+                      {
+                        "field": "品类三级",
+                        "op": "contains",
+                        "value": "湿巾"
+                      },
+                      {
+                        "field": "物料库存类别",
+                        "op": "contains",
+                        "value": "湿纸巾"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "field": "不含液成品净重（kg）",
+                "op": "notEmpty"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "pdf-rollgeom",
+      "no": 5,
+      "title": "节距 / 卷高",
+      "description": "库存类别含卫卷且非方块：节距、卷高不得为空；“无要求/无节距”视为已确认；非数字计阻断。",
+      "enabled": true,
+      "scope": {
+        "logic": "AND",
+        "conditions": [
+          {
+            "field": "物料库存类别",
+            "op": "contains",
+            "value": "卫卷"
+          },
+          {
+            "field": "物料库存类别",
+            "op": "notContains",
+            "value": "方块"
+          }
+        ]
+      },
+      "checks": [
+        {
+          "id": "c1",
+          "enabled": true,
+          "message": "节距",
+          "code": "PFM",
+          "when": {
+            "field": "节距",
+            "op": "empty"
+          }
+        },
+        {
+          "id": "c2",
+          "enabled": true,
+          "message": "节距",
+          "code": "PFN",
+          "when": {
+            "field": "节距",
+            "op": "junk"
+          }
+        },
+        {
+          "id": "c3",
+          "enabled": true,
+          "message": "卷高",
+          "code": "PFM",
+          "when": {
+            "field": "卷高",
+            "op": "empty"
+          }
+        },
+        {
+          "id": "c4",
+          "enabled": true,
+          "message": "卷高",
+          "code": "PFN",
+          "when": {
+            "field": "卷高",
+            "op": "junk"
+          }
+        }
+      ]
+    },
+    {
+      "id": "pdf-rollname",
+      "no": 6,
+      "title": "节数 / 米数 / 净含量 / 毛重每卷",
+      "description": "卫卷标准品：名称含“毛重：N克”时毛重/卷须 >0；名称含“克”时净含量须 >0；名称含“节数/米数”时对应字段须 >0（字段均已设必填，不再校验非空）。",
+      "enabled": true,
+      "scope": {
+        "logic": "AND",
+        "conditions": [
+          {
+            "logic": "AND",
+            "conditions": [
+              {
+                "field": "物料库存类别",
+                "op": "contains",
+                "value": "卫卷"
+              },
+              {
+                "field": "物料库存类别",
+                "op": "notContains",
+                "value": "方块"
+              }
+            ]
+          },
+          {
+            "logic": "OR",
+            "conditions": [
+              {
+                "field": "标准/迷你",
+                "op": "empty"
+              },
+              {
+                "field": "标准/迷你",
+                "op": "prefix",
+                "value": "标准"
+              }
+            ]
+          }
+        ]
+      },
+      "checks": [
+        {
+          "id": "c1",
+          "enabled": true,
+          "message": "毛重/卷",
+          "code": "PFM",
+          "when": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "field": "物料说明",
+                "op": "grossName"
+              },
+              {
+                "field": "毛重/卷",
+                "op": "empty"
+              }
+            ]
+          }
+        },
+        {
+          "id": "c2",
+          "enabled": true,
+          "message": "毛重/卷",
+          "code": "PFN",
+          "when": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "field": "物料说明",
+                "op": "grossName"
+              },
+              {
+                "logic": "OR",
+                "conditions": [
+                  {
+                    "field": "毛重/卷",
+                    "op": "junk"
+                  },
+                  {
+                    "field": "毛重/卷",
+                    "op": "lte",
+                    "value": 0
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "c3",
+          "enabled": true,
+          "message": "净含量",
+          "code": "PFM",
+          "when": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "field": "物料说明",
+                "op": "contains",
+                "value": "克"
+              },
+              {
+                "field": "净含量",
+                "op": "empty"
+              }
+            ]
+          }
+        },
+        {
+          "id": "c4",
+          "enabled": true,
+          "message": "净含量",
+          "code": "PFN",
+          "when": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "field": "物料说明",
+                "op": "contains",
+                "value": "克"
+              },
+              {
+                "logic": "OR",
+                "conditions": [
+                  {
+                    "field": "净含量",
+                    "op": "junk"
+                  },
+                  {
+                    "field": "净含量",
+                    "op": "lte",
+                    "value": 0
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "c5",
+          "enabled": true,
+          "message": "节数",
+          "code": "PFM",
+          "when": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "field": "物料说明",
+                "op": "contains",
+                "value": "节数"
+              },
+              {
+                "field": "节数",
+                "op": "empty"
+              }
+            ]
+          }
+        },
+        {
+          "id": "c6",
+          "enabled": true,
+          "message": "节数",
+          "code": "PFN",
+          "when": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "field": "物料说明",
+                "op": "contains",
+                "value": "节数"
+              },
+              {
+                "logic": "OR",
+                "conditions": [
+                  {
+                    "field": "节数",
+                    "op": "junk"
+                  },
+                  {
+                    "field": "节数",
+                    "op": "lte",
+                    "value": 0
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "c7",
+          "enabled": true,
+          "message": "米数",
+          "code": "PFM",
+          "when": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "field": "物料说明",
+                "op": "contains",
+                "value": "米数"
+              },
+              {
+                "field": "米数",
+                "op": "empty"
+              }
+            ]
+          }
+        },
+        {
+          "id": "c8",
+          "enabled": true,
+          "message": "米数",
+          "code": "PFN",
+          "when": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "field": "物料说明",
+                "op": "contains",
+                "value": "米数"
+              },
+              {
+                "logic": "OR",
+                "conditions": [
+                  {
+                    "field": "米数",
+                    "op": "junk"
+                  },
+                  {
+                    "field": "米数",
+                    "op": "lte",
+                    "value": 0
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "pdf-paper",
+      "no": 7,
+      "title": "纸长 / 纸宽",
+      "description": "面巾类、纸巾、餐巾、湿巾、口罩、生活用垫纸（非卷类、非组合）：纸长、纸宽不得为空。常规软抽/面巾（库存类别 成品.面巾.软抽*、成品.面巾.面巾*）纸宽不得为 105/120/133/153/160/187/189——这些是典型纸长值，出现即长宽互换嫌疑，计阻断。",
+      "enabled": true,
+      "scope": {
+        "logic": "AND",
+        "conditions": [
+          {
+            "field": "品类三级",
+            "op": "in",
+            "value": "乳霜软抽、公用擦手纸、口罩、女性护理湿巾、婴儿护理湿巾、悬挂式公用擦手纸、悬挂式多用纸抹布、悬挂式软抽、成人护理湿巾、抽取多用纸抹布、生活用垫纸、生活用纸湿巾、纸巾、纸巾便携式、软抽、面巾、餐巾"
+          },
+          {
+            "logic": "NOT",
+            "conditions": [
+              {
+                "logic": "AND",
+                "conditions": [
+                  {
+                    "field": "物料库存类别",
+                    "op": "contains",
+                    "value": "卫卷"
+                  },
+                  {
+                    "field": "物料库存类别",
+                    "op": "notContains",
+                    "value": "方块"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "logic": "NOT",
+            "conditions": [
+              {
+                "logic": "OR",
+                "conditions": [
+                  {
+                    "field": "物料库存类别",
+                    "op": "contains",
+                    "value": "组合"
+                  },
+                  {
+                    "field": "是否组合装",
+                    "op": "eq",
+                    "value": "是"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "checks": [
+        {
+          "id": "c1",
+          "enabled": true,
+          "message": "纸长",
+          "code": "PFM",
+          "when": {
+            "field": "纸长",
+            "op": "empty"
+          }
+        },
+        {
+          "id": "c2",
+          "enabled": true,
+          "message": "纸长",
+          "code": "PFN",
+          "when": {
+            "field": "纸长",
+            "op": "junk"
+          }
+        },
+        {
+          "id": "c3",
+          "enabled": true,
+          "message": "纸宽",
+          "code": "PFM",
+          "when": {
+            "field": "纸宽",
+            "op": "empty"
+          }
+        },
+        {
+          "id": "c4",
+          "enabled": true,
+          "message": "纸宽",
+          "code": "PFN",
+          "when": {
+            "field": "纸宽",
+            "op": "junk"
+          }
+        },
+        {
+          "id": "c5",
+          "enabled": true,
+          "message": "纸长≤0",
+          "code": "PFC",
+          "when": {
+            "field": "纸长",
+            "op": "lte",
+            "value": 0
+          }
+        },
+        {
+          "id": "c6",
+          "enabled": true,
+          "message": "纸宽≤0",
+          "code": "PFC",
+          "when": {
+            "field": "纸宽",
+            "op": "lte",
+            "value": 0
+          }
+        },
+        {
+          "id": "c7",
+          "enabled": true,
+          "message": "纸长纸宽疑似互换",
+          "code": "PFC",
+          "when": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "logic": "OR",
+                "conditions": [
+                  {
+                    "field": "物料库存类别",
+                    "op": "prefix",
+                    "value": "成品.面巾.软抽"
+                  },
+                  {
+                    "field": "物料库存类别",
+                    "op": "prefix",
+                    "value": "成品.面巾.面巾"
+                  }
+                ]
+              },
+              {
+                "field": "纸宽",
+                "op": "numberIn",
+                "value": "105、120、133、153、160、187、189"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "pdf-fsc",
+      "no": 8,
+      "title": "FSC 产品重量一位小数",
+      "description": "FSC 产品净重、毛重、不含赠品净重、报关净重小数点后保留 1 位（参照 VGD-品管-LL[2015]5号）。本报表无 FSC/PEFC 标识字段，待数据支持后启用。",
+      "enabled": false,
+      "scope": {
+        "logic": "AND",
+        "conditions": []
+      },
+      "checks": []
+    },
+    {
+      "id": "pdf-sheet",
+      "no": 9,
+      "title": "抽(张)/包(盒) · 张/片数",
+      "description": "排除护理、卷类、口罩、马桶垫（生活用垫纸）与湿巾组合：餐巾/湿巾/纸巾查张/片数，其余面巾类查抽(张)/包(盒)；不得为空、不得为非数字。原始装数单位口径：湿巾=片、餐巾=张。",
+      "enabled": true,
+      "scope": {
+        "logic": "AND",
+        "conditions": [
+          {
+            "field": "品类三级",
+            "op": "notIn",
+            "value": "个护产品、卫生巾、卫生护垫、卫生棉条、口罩、女性护肤用品、婴儿护肤用品、婴儿纸尿片、婴儿纸尿裤、婴儿裤型纸尿裤、常规内裤、成人尿渗护垫、成人护理垫、成人护肤用品、成人纸尿片、成人纸尿裤、成人裤型纸尿裤、日抛内裤、生活用垫纸、裤型卫生巾"
+          },
+          {
+            "logic": "NOT",
+            "conditions": [
+              {
+                "logic": "AND",
+                "conditions": [
+                  {
+                    "field": "物料库存类别",
+                    "op": "contains",
+                    "value": "卫卷"
+                  },
+                  {
+                    "field": "物料库存类别",
+                    "op": "notContains",
+                    "value": "方块"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "logic": "NOT",
+            "conditions": [
+              {
+                "logic": "AND",
+                "conditions": [
+                  {
+                    "logic": "OR",
+                    "conditions": [
+                      {
+                        "field": "品类三级",
+                        "op": "contains",
+                        "value": "湿巾"
+                      },
+                      {
+                        "field": "物料库存类别",
+                        "op": "contains",
+                        "value": "湿纸巾"
+                      }
+                    ]
+                  },
+                  {
+                    "logic": "OR",
+                    "conditions": [
+                      {
+                        "field": "物料库存类别",
+                        "op": "contains",
+                        "value": "组合"
+                      },
+                      {
+                        "field": "是否组合装",
+                        "op": "eq",
+                        "value": "是"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "checks": [
+        {
+          "id": "c1",
+          "enabled": true,
+          "message": "张/片数",
+          "code": "PFM",
+          "when": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "logic": "OR",
+                "conditions": [
+                  {
+                    "field": "品类三级",
+                    "op": "in",
+                    "value": "纸巾、纸巾便携式、餐巾"
+                  },
+                  {
+                    "logic": "OR",
+                    "conditions": [
+                      {
+                        "field": "品类三级",
+                        "op": "contains",
+                        "value": "湿巾"
+                      },
+                      {
+                        "field": "物料库存类别",
+                        "op": "contains",
+                        "value": "湿纸巾"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "field": "张/片数",
+                "op": "empty"
+              }
+            ]
+          }
+        },
+        {
+          "id": "c2",
+          "enabled": true,
+          "message": "张/片数",
+          "code": "PFN",
+          "when": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "logic": "OR",
+                "conditions": [
+                  {
+                    "field": "品类三级",
+                    "op": "in",
+                    "value": "纸巾、纸巾便携式、餐巾"
+                  },
+                  {
+                    "logic": "OR",
+                    "conditions": [
+                      {
+                        "field": "品类三级",
+                        "op": "contains",
+                        "value": "湿巾"
+                      },
+                      {
+                        "field": "物料库存类别",
+                        "op": "contains",
+                        "value": "湿纸巾"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "field": "张/片数",
+                "op": "junk"
+              }
+            ]
+          }
+        },
+        {
+          "id": "c3",
+          "enabled": true,
+          "message": "抽(张)/包(盒)",
+          "code": "PFM",
+          "when": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "logic": "AND",
+                "conditions": [
+                  {
+                    "field": "品类三级",
+                    "op": "in",
+                    "value": "乳霜软抽、公用擦手纸、悬挂式公用擦手纸、悬挂式多用纸抹布、悬挂式软抽、抽取多用纸抹布、软抽、面巾"
+                  },
+                  {
+                    "logic": "NOT",
+                    "conditions": [
+                      {
+                        "logic": "OR",
+                        "conditions": [
+                          {
+                            "field": "品类三级",
+                            "op": "contains",
+                            "value": "湿巾"
+                          },
+                          {
+                            "field": "物料库存类别",
+                            "op": "contains",
+                            "value": "湿纸巾"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "field": "抽(张)/包(盒)",
+                "op": "empty"
+              }
+            ]
+          }
+        },
+        {
+          "id": "c4",
+          "enabled": true,
+          "message": "抽(张)/包(盒)",
+          "code": "PFN",
+          "when": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "logic": "AND",
+                "conditions": [
+                  {
+                    "field": "品类三级",
+                    "op": "in",
+                    "value": "乳霜软抽、公用擦手纸、悬挂式公用擦手纸、悬挂式多用纸抹布、悬挂式软抽、抽取多用纸抹布、软抽、面巾"
+                  },
+                  {
+                    "logic": "NOT",
+                    "conditions": [
+                      {
+                        "logic": "OR",
+                        "conditions": [
+                          {
+                            "field": "品类三级",
+                            "op": "contains",
+                            "value": "湿巾"
+                          },
+                          {
+                            "field": "物料库存类别",
+                            "op": "contains",
+                            "value": "湿纸巾"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "field": "抽(张)/包(盒)",
+                "op": "junk"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "pdf-rollpack",
+      "no": 10,
+      "title": "小卷/包净重 · 小卷/包毛重",
+      "description": "面巾/卫卷/纸巾/餐巾/湿巾范围：两项不得为空、须为数字、小卷/包净重 < 小卷/包毛重（矛盾计阻断）；除湿巾、餐巾外 小卷/包净重(g) × 装数 = 不含赠品净重，2% 容差（不符计一致性待核）。",
+      "enabled": true,
+      "scope": {
+        "logic": "OR",
+        "conditions": [
+          {
+            "field": "$ruleCat",
+            "op": "in",
+            "value": "卫卷、纸巾、面巾、餐巾"
+          },
+          {
+            "logic": "OR",
+            "conditions": [
+              {
+                "field": "品类三级",
+                "op": "contains",
+                "value": "湿巾"
+              },
+              {
+                "field": "物料库存类别",
+                "op": "contains",
+                "value": "湿纸巾"
+              }
+            ]
+          }
+        ]
+      },
+      "checks": [
+        {
+          "id": "c1",
+          "enabled": true,
+          "message": "小卷/包净重",
+          "code": "PFM",
+          "when": {
+            "field": "小卷/包净重(g)",
+            "op": "empty"
+          }
+        },
+        {
+          "id": "c2",
+          "enabled": true,
+          "message": "小卷/包净重",
+          "code": "PFN",
+          "when": {
+            "field": "小卷/包净重(g)",
+            "op": "junk"
+          }
+        },
+        {
+          "id": "c3",
+          "enabled": true,
+          "message": "小卷/包毛重",
+          "code": "PFM",
+          "when": {
+            "field": "小卷/包毛重(g)",
+            "op": "empty"
+          }
+        },
+        {
+          "id": "c4",
+          "enabled": true,
+          "message": "小卷/包毛重",
+          "code": "PFN",
+          "when": {
+            "field": "小卷/包毛重(g)",
+            "op": "junk"
+          }
+        },
+        {
+          "id": "c5",
+          "enabled": true,
+          "message": "小卷/包净重≥小卷/包毛重",
+          "code": "PFC",
+          "when": {
+            "field": "小卷/包净重(g)",
+            "op": "gte",
+            "otherField": "小卷/包毛重(g)",
+            "epsilon": 1e-09
+          }
+        },
+        {
+          "id": "c6",
+          "enabled": true,
+          "message": "小卷/包净重×装数≠不含赠品净重",
+          "code": "PFP",
+          "when": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "logic": "NOT",
+                "conditions": [
+                  {
+                    "logic": "OR",
+                    "conditions": [
+                      {
+                        "field": "品类三级",
+                        "op": "contains",
+                        "value": "湿巾"
+                      },
+                      {
+                        "field": "物料库存类别",
+                        "op": "contains",
+                        "value": "湿纸巾"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "field": "品类三级",
+                "op": "neq",
+                "value": "餐巾"
+              },
+              {
+                "field": "原始装数",
+                "op": "nonzero"
+              },
+              {
+                "op": "difference",
+                "left": "[小卷/包净重(g)] * [原始装数]",
+                "right": "[不含赠品净重] * 1000",
+                "absolute": 1,
+                "relative": 0.02
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "pdf-pian",
+      "no": 11,
+      "title": "pian 数校验",
+      "description": "OA 新增逻辑：包装规格单位含 pian/片 时，pian数量 × 物料规格乘积 应等于 1（pian数量为折算系数 1/装数）；不符或未维护计一致性待核。",
+      "enabled": true,
+      "scope": {
+        "logic": "OR",
+        "conditions": [
+          {
+            "logic": "OR",
+            "conditions": [
+              {
+                "field": "包装规格单位1",
+                "op": "icontains",
+                "value": "pian"
+              },
+              {
+                "field": "包装规格单位1",
+                "op": "contains",
+                "value": "片"
+              }
+            ]
+          },
+          {
+            "logic": "OR",
+            "conditions": [
+              {
+                "field": "包装规格单位2",
+                "op": "icontains",
+                "value": "pian"
+              },
+              {
+                "field": "包装规格单位2",
+                "op": "contains",
+                "value": "片"
+              }
+            ]
+          },
+          {
+            "logic": "OR",
+            "conditions": [
+              {
+                "field": "包装规格单位3",
+                "op": "icontains",
+                "value": "pian"
+              },
+              {
+                "field": "包装规格单位3",
+                "op": "contains",
+                "value": "片"
+              }
+            ]
+          },
+          {
+            "logic": "OR",
+            "conditions": [
+              {
+                "field": "包装规格单位4",
+                "op": "icontains",
+                "value": "pian"
+              },
+              {
+                "field": "包装规格单位4",
+                "op": "contains",
+                "value": "片"
+              }
+            ]
+          }
+        ]
+      },
+      "checks": [
+        {
+          "id": "c1",
+          "enabled": true,
+          "message": "pian数量",
+          "code": "PFM",
+          "when": {
+            "field": "pian数量",
+            "op": "empty"
+          }
+        },
+        {
+          "id": "c2",
+          "enabled": true,
+          "message": "pian数量与规格乘积不符",
+          "code": "PFP",
+          "when": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "field": "$specP",
+                "op": "nonzero"
+              },
+              {
+                "op": "difference",
+                "left": "[pian数量] * [$specP]",
+                "right": "1",
+                "absolute": 0.5,
+                "relative": 1e-06,
+                "reference": "$specP"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

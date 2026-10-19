@@ -1,0 +1,11 @@
+{
+  "name": "mdm-advanced-query-console",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "python3 scripts/serve.py 4173",
+    "start": "python3 scripts/launch_workbench.py",
+    "build": "python3 scripts/build_adv_query_workbench.py"
+  }
+}

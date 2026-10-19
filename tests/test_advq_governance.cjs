@@ -1,0 +1,45 @@
+// Governance ownership, legacy migration, independent filters and shared search scope.
+const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
+const root=path.resolve(__dirname,'..');
+const dataset=JSON.parse(fs.readFileSync(path.join(root,'outputs/advq/dataset.json')));
+const PROCESS_DEFAULTS=JSON.parse(fs.readFileSync(path.join(root,'outputs/advq/process-rules.defaults.json')));
+const context=vm.createContext({assert,dataset,PROCESS_DEFAULTS,console,navigator:{},setTimeout:()=>0,clearTimeout:()=>{}});
+for(const name of ['core','process','config','views','views2','events'])vm.runInContext(fs.readFileSync(path.join(root,`outputs/advq/advq.${name}.js`),'utf8').replace(/init\(\);\s*$/,''),context);
+vm.runInContext(`
+DATASET=dataset;buildIndexes();
+const rules=processClone(PROCESS_DEFAULTS);rules.rules[1].enabled=false;
+const legacy={v:6,tab:'mps',mpsFilter:{view:'attributes',attributeOnlyIssue:false,status:'逻辑异常',cat:'卫卷',issueType:'旧路线筛选',page:8},processRules:rules};
+applyUserSettings(decodeUserConfig(legacy));
+assert.equal(state.tab,'process');
+assert.equal(state.processCheckFilter.onlyIssue,false);
+assert.equal(state.processCheckFilter.page,1);
+assert.equal(state.mpsFilter.status,'逻辑异常');assert.equal(state.mpsFilter.cat,'卫卷');
+assert.equal(Object.hasOwn(state.mpsFilter,'view'),false);assert.equal(Object.hasOwn(state.mpsFilter,'attributeOnlyIssue'),false);
+assert.equal(MPS_ONLY_KEYS.has('pdfCount'),false);assert.equal(PROCESS_CHECK_KEYS.has('pdfCount'),true);
+assert.equal(JSON.stringify(captureUserSettings().processRules),JSON.stringify(rules));
+let saved=captureUserSettings();saved.tab='mps';saved.processCheckFilter.onlyIssue=true;applyUserSettings(decodeUserConfig(configDoc(saved)));
+assert.equal(state.tab,'mps','new MPS selection must remain MPS');assert.equal(state.processCheckFilter.onlyIssue,true);
+for(const field of ['status','cat','issueType'])state.mpsFilter[field]='不存在的路线筛选';
+computeDerived();
+assert.equal(processCheckRows().length,derived.filtered.filter((r)=>r.pdfCount>0).length,'route-local filters cannot affect normal MDM checks');
+let exported;download=(name,content)=>{exported={name,content};};toast=()=>{};
+exportMpsCsv();assert.equal(exported,undefined,'an empty MPS selection cannot export the broader scope');
+state.mpsFilter={status:'',cat:'',issueType:'',onlyIssue:false,page:1};
+exportMpsCsv();assert.ok(exported.name.startsWith('MPS工艺路线'));assert.equal(exported.content.includes('工艺属性检查问题数'),false);
+state.processCheckFilter.onlyIssue=false;exportProcessChecksCsv();assert.ok(exported.name.startsWith('工艺属性检查'));assert.ok(exported.name.includes('-'+derived.total+'条-'));
+const nonRoute=derived.filtered.find((r)=>!r.route&&r.pdfCount>0);assert.ok(nonRoute);
+state.q=nonRoute.material;state.qMode='exact';state.qField='material';computeDerived();assert.equal(derived.total,1);
+assert.equal(processCheckRows()[0].material,nonRoute.material);exportProcessChecksCsv();assert.ok(exported.content.includes(nonRoute.material));assert.ok(exported.name.includes('-1条-'));
+assert.equal(derived.stats.withIssues>0,true,'normal process checks must remain part of MDM governance totals');
+let processRenders=0,routeRenders=0,refreshes=0;
+renderProcessChecks=()=>{processRenders++;};renderMps=()=>{routeRenders++;};refreshAll=()=>{refreshes++;};
+document={querySelectorAll:()=>[]};
+function click(action,value){const button={dataset:{act:action,v:value},tagName:'BUTTON',closest:()=>null};onClick({target:{closest:(selector)=>selector==='[data-act]'?button:null}});}
+state.mpsFilter.page=5;click('process-check-page','3');assert.equal(state.processCheckFilter.page,3);assert.equal(state.mpsFilter.page,5);assert.equal(processRenders,1);assert.equal(routeRenders,0);
+click('process-check-scope','all');assert.equal(state.processCheckFilter.page,1);assert.equal(state.processCheckFilter.onlyIssue,false);assert.equal(state.mpsFilter.page,5);
+click('mps-page','2');assert.equal(state.mpsFilter.page,2);assert.equal(state.processCheckFilter.page,1);assert.equal(routeRenders,1);
+click('tab','process');assert.equal(state.tab,'process');assert.equal(refreshes,1);
+click('mps-clear-filter');assert.equal(state.processCheckFilter.onlyIssue,false);assert.equal(Object.hasOwn(state.mpsFilter,'view'),false);
+const current=captureUserSettings();assert.ok(current.processCheckFilter);assert.equal(Object.hasOwn(current.mpsFilter,'attributeOnlyIssue'),false);
+console.log('PASS: process governance is separate from MPS; legacy settings migrate without losing rules; filters, paging and exports are independent and share global search.');
+`,context);
