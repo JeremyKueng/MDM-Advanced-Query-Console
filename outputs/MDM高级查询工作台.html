@@ -3810,7 +3810,7 @@ function validateProcessConfig(config) {
     if(typeof(c.epsilon??0)!=='number'||!Number.isFinite(c.epsilon??0)||(c.epsilon??0)<0)throw new Error('数值精度无效');
     if(!['empty','notEmpty','junk','grossName','nonzero'].includes(c.op)&&!c.otherField){if(String(c.value??'').trim()==='')throw new Error('请填写条件值');if(['eq','neq','gt','gte','lt','lte','between'].includes(c.op)&&PROCESS_DATE_FIELDS.has(c.field)){if(!isoDate(c.value))throw new Error('日期请输入完整的 YYYYMMDD 或 YYYY-MM-DD');}
       else if(['gt','gte','lt','lte','between'].includes(c.op)&&processNumber(c.value)===null)throw new Error('大小比较必须填写数字');
-      if(c.op==='between'){const from=PROCESS_DATE_FIELDS.has(c.field)?isoDate(c.value):processNumber(c.value),to=PROCESS_DATE_FIELDS.has(c.field)?isoDate(c.valueTo):processNumber(c.valueTo);if(to===null||to===''||from>to)throw new Error('请填写完整且起止正确的区间');} 
+      if(c.op==='between'){const from=PROCESS_DATE_FIELDS.has(c.field)?isoDate(c.value):processNumber(c.value),to=PROCESS_DATE_FIELDS.has(c.field)?isoDate(c.valueTo):processNumber(c.valueTo);if(to===null||to===''||from>to)throw new Error('请填写完整且起止正确的区间');}
       if(c.op==='numberIn'&&String(c.value).split(/[、,，;；\n]/).some((x)=>processNumber(x)===null))throw new Error('可选数值列表含无效数字');}
   }
   node(config.scope);const ids=new Set(),nos=new Set();

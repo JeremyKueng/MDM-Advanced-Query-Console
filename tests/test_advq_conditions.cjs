@@ -33,7 +33,7 @@ for (const field of ['created', 'updated']) {
     }).length;
     state.filters.customConditions = [condition]; computeDerived();
     assert.equal(derived.total, expected, field + ' ' + op);
-    
+
   }
 }
 state.filters.customConditions = [{ field: 'updated', op: 'between', val: '20261001', valTo: '20261001' }];
