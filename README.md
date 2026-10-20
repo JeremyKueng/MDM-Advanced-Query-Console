@@ -77,6 +77,7 @@ node tests/test_advq_mps.cjs
 node tests/test_advq_quick_detail.cjs
 node tests/test_advq_routing.cjs
 node tests/test_advq_searchdock.cjs
+node tests/test_advq_source_modal.cjs
 ```
 
 去敏范围与发布约定见 [发布说明](docs/DEIDENTIFICATION.md)。

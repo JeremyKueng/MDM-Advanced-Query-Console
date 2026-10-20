@@ -731,9 +731,9 @@ async function openSourceModal() {
   const box = document.getElementById("modal-box");
   box.style.width = "min(680px, 95vw)";
   const m = DATASET.meta || {};
-  const shareUnc = (info && info.shareUnc) || m.shareUnc || "";
 
   const { base: apiBase, info } = await resolveApiBase();
+  const shareUnc = (info && info.shareUnc) || m.shareUnc || "";
   const cand = (info && info.latestCandidate) || {};
   const shareCands = (info && info.shareCandidates) || [];
   const shareSmb = (info && info.shareSmb) || "";
