@@ -635,6 +635,9 @@ function bindTableDragAndScrollGuard() {
   }, 120));
 }
 let LAST_SHARE_STATUS = null;
+let SOURCE_API_PROBE = null;
+let SOURCE_INFO_REQUEST = null;
+let LAST_SOURCE_INFO = null;
 
 const IS_WIN_CLIENT = /Win/i.test((navigator && (navigator.platform || navigator.userAgent)) || "");
 
@@ -644,7 +647,7 @@ function updateShareStatusChip(shareStatus, apiReady) {
   chip.classList.remove("ok", "warn", "err");
   if (!apiReady || !shareStatus) {
     chip.classList.add("warn");
-    chip.title = "更新数据源 · 本地服务未连接";
+    chip.title = apiReady ? "更新数据源 · 本地服务已连接，共享盘待检查" : "更新数据源 · 本地服务未连接";
     return;
   }
   LAST_SHARE_STATUS = shareStatus;
@@ -654,24 +657,66 @@ function updateShareStatusChip(shareStatus, apiReady) {
   chip.title = "更新数据源 · " + (connected ? "共享盘已连接" : pending ? "共享盘待连接或认证" : "共享盘网络未连通");
 }
 
-async function resolveApiBase() {
-  const candidates = [];
-  if (location.protocol.startsWith("http")) candidates.push("");
-  candidates.push("http://127.0.0.1:4173", "http://localhost:4173");
-  for (const base of candidates) {
-    try {
-      const resp = await fetch(base + "/api/source-info");
-      if (resp.ok) {
+async function sourceJson(url, timeoutMs) {
+  const controller = new AbortController();
+  let timer;
+  try {
+    return await Promise.race([
+      (async () => {
+        const resp = await fetch(url, { signal: controller.signal });
+        if (!resp.ok) throw new Error("服务返回 " + resp.status);
         const info = await resp.json();
-        if (info && info.ok) {
-          updateShareStatusChip(info.shareStatus, true);
-          return { base, info };
-        }
-      }
-    } catch (err) { /* 继续探测下一个候选地址 */ }
+        if (!info || !info.ok) throw new Error("服务返回的数据无效");
+        return info;
+      })(),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => { controller.abort(); reject(new Error("连接检查超时，请重试")); }, timeoutMs);
+      }),
+    ]);
+  } finally { clearTimeout(timer); }
+}
+
+function resolveApiBase() {
+  if (SOURCE_API_PROBE) return SOURCE_API_PROBE;
+  SOURCE_API_PROBE = (async () => {
+    const candidates = [];
+    if (location.protocol.startsWith("http")) candidates.push("");
+    candidates.push("http://127.0.0.1:4173", "http://localhost:4173");
+    for (const base of candidates) {
+      try {
+        // 服务存活检查不扫描共享盘，本地文件导入无需等待 SMB 诊断。
+        const info = await sourceJson(base + "/api/health", 1200);
+        if (info.service !== "mdm-advanced-query-console") continue;
+        updateShareStatusChip(LAST_SOURCE_INFO && LAST_SOURCE_INFO.base === base ? LAST_SOURCE_INFO.info.shareStatus : null, true);
+        return { base, info };
+      } catch (err) { /* 继续探测下一个候选地址 */ }
+    }
+    updateShareStatusChip(null, false);
+    return { base: "", info: null };
+  })().finally(() => { SOURCE_API_PROBE = null; });
+  return SOURCE_API_PROBE;
+}
+
+function loadSourceInfo(base, force = false) {
+  if (SOURCE_INFO_REQUEST && SOURCE_INFO_REQUEST.base === base) return SOURCE_INFO_REQUEST.promise;
+  if (!force && LAST_SOURCE_INFO && LAST_SOURCE_INFO.base === base && Date.now() - LAST_SOURCE_INFO.at < 30000) {
+    return Promise.resolve(LAST_SOURCE_INFO.info);
   }
-  updateShareStatusChip(null, false);
-  return { base: "", info: null };
+  const request = { base };
+  request.promise = sourceJson(base + "/api/source-info", 15000).then((info) => {
+    LAST_SOURCE_INFO = { base, info, at: Date.now() };
+    updateShareStatusChip(info.shareStatus, true);
+    return info;
+  }).finally(() => { if (SOURCE_INFO_REQUEST === request) SOURCE_INFO_REQUEST = null; });
+  SOURCE_INFO_REQUEST = request;
+  return request.promise;
+}
+
+async function warmSourceInfo() {
+  const { base, info } = await resolveApiBase();
+  if (info) {
+    try { await loadSourceInfo(base); } catch (err) { /* 弹窗内提供重试，不打断查询。 */ }
+  }
 }
 
 function renderShareDiagCard(st, apiReady) {
@@ -732,51 +777,30 @@ async function openSourceModal() {
   box.style.width = "min(680px, 95vw)";
   const m = DATASET.meta || {};
 
-  const { base: apiBase, info } = await resolveApiBase();
-  const shareUnc = (info && info.shareUnc) || m.shareUnc || "";
-  const cand = (info && info.latestCandidate) || {};
-  const shareCands = (info && info.shareCandidates) || [];
-  const shareSmb = (info && info.shareSmb) || "";
-  const shareStatus = (info && info.shareStatus) || null;
-  const apiReady = !!(info && info.ok);
-
-  const shareOpts = shareCands.filter((c) => c.isShare);
-
-  const shareConnected = apiReady && shareStatus && shareStatus.overall === "connected";
-  const target = shareOpts[0] || cand;
-  const canUpdateShare = apiReady && !!target.path;
-  const statusText = !apiReady ? "本地服务未连接" : shareConnected ? "共享盘可用" : "共享盘待连接";
-  const statusClass = shareConnected ? "ok" : "warn";
-  const multipleFiles = shareOpts.length > 1;
+  let apiBase = "", info = null, apiReady = false, checking = true, sourceError = "";
+  let shareUnc = m.shareUnc || "", shareSmb = "";
+  let connectionVersion = 0;
 
   box.innerHTML = '<h3>' + ic("database", 16) + ' 更新数据源</h3>'
     + '<div class="source-current"><small>当前数据</small><strong>' + esc(m.source || "—") + '</strong>'
     + '<span class="source-file-meta">' + (m.sourceRows || 0).toLocaleString() + ' 条记录 · 报表时间 ' + esc(m.sourceStamp || "—") + '</span></div>'
-    + '<div class="src-route-card recommend">'
-    + '<div class="source-card-head"><h4>' + ic("database", 14) + ' 共享盘更新 <span class="tag blue">推荐</span></h4>'
-    + '<span class="source-connection-state ' + statusClass + '">' + esc(statusText) + '</span></div>'
-    + (multipleFiles ? '<label class="source-file-meta" for="srcShareFileSelect">选择报表</label><select class="cfg-select source-share-select" id="srcShareFileSelect">'
-      + shareOpts.map((c) => '<option value="' + esc(c.path) + '">' + esc(c.name) + ' · ' + esc(c.mtime || '') + '</option>').join('') + '</select>'
-      : '<div class="source-file-name">' + esc(target.name || '暂未找到可用报表') + '</div>'
-        + (target.mtime ? '<span class="source-file-meta">报表时间 ' + esc(target.mtime) + '</span>' : ''))
-    + '<div class="source-action-row"><button class="tool-btn primary" id="btnRoute2Auto"' + (!canUpdateShare ? ' disabled' : '') + '>' + ic("refresh", 13) + ' 更新共享盘数据</button></div>'
-    + (!apiReady ? '<span class="source-file-meta">请先双击项目中的「启动工作台」，再展开下方连接详情重新连接。</span>' : !target.path ? '<span class="source-file-meta">可在下方检查共享盘连接，或导入本地文件。</span>' : '<span class="source-file-meta">共享盘报表包含有效物料。</span>')
-    + '</div>'
+    + '<div class="src-route-card recommend" id="sourceSharePanel"></div>'
     + '<div class="src-route-card"><h4>' + ic("upload", 14) + ' 本地文件</h4>'
     + '<p>导入 .xlsx 物料报表，支持包含有效和无效物料的全量数据。</p>'
     + '<button class="tool-btn" id="btnRoute1Pick"' + (!apiReady ? ' disabled' : '') + '>' + ic("upload", 13) + ' 选择文件导入</button>'
+    + '<span class="source-file-meta" id="sourceLocalStatus" role="status">正在连接本地服务…</span>'
     + '<details class="source-path"><summary>通过文件路径导入</summary>'
     + '<input class="src-input" id="srcLocalPathInput" type="text" aria-label="物料报表文件路径" placeholder="粘贴 .xlsx 报表完整路径" value="' + esc(m.sourcePath || "") + '">'
     + '<button class="mini-btn" id="btnRoute1Path"' + (!apiReady ? ' disabled' : '') + '>' + ic("check", 12) + ' 按路径导入</button></details></div>'
     + '<p class="source-dialog-note">更新后重新计算校验和工艺路线，保留个人视图配置。</p>'
-    + '<details class="source-advanced"' + (!apiReady ? ' open' : '') + '><summary>连接与数据详情</summary><div>'
-    + renderShareDiagCard(shareStatus, apiReady)
-    + '<dl class="source-paths"><dt>Windows 路径</dt><dd>' + esc(shareUnc) + '</dd><dt>macOS 地址</dt><dd>' + esc(shareSmb) + '</dd></dl>'
-    + renderSourceLineage() + '</div></details>'
+    + '<details class="source-advanced" id="sourceAdvanced"><summary>连接与数据详情</summary><div>'
+    + '<div id="sourceConnectionDetails"></div>' + renderSourceLineage() + '</div></details>'
     + '<div class="macts"><button class="tool-btn" id="modalCloseSrc">关闭</button></div>';
 
   mask.classList.add("open");
   if (typeof syncBodyScrollLock === "function") syncBodyScrollLock();
+  const sharePanel = document.getElementById("sourceSharePanel");
+  const isCurrent = () => mask.classList.contains("open") && document.getElementById("sourceSharePanel") === sharePanel;
   const close = () => {
     box.style.width = "";
     mask.classList.remove("open");
@@ -785,102 +809,145 @@ async function openSourceModal() {
   document.getElementById("modalCloseSrc").onclick = close;
   mask.onclick = (e) => { if (e.target === mask) close(); };
 
-  const retryConnectFn = async (btn) => {
-    if (btn) { btn.disabled = true; btn.textContent = "正在连接 127.0.0.1:4173…"; }
-    const res = await resolveApiBase();
-    if (res && res.info && res.info.ok) {
-      toast("已成功连接本地后台服务（端口 4173）！");
-      openSourceModal();
-    } else {
-      if (btn) { btn.disabled = false; btn.textContent = "重新连接后台服务 (4173)"; }
-      toast("本地服务未启动：请先双击「启动工作台」，再重新连接", true);
-    }
-  };
-  ["btnRetryConnectApi"].forEach((id) => {
-    const b = document.getElementById(id);
-    if (b) b.onclick = () => retryConnectFn(b);
-  });
-  ["btnOpenOnlineWorkbench"].forEach((id) => {
-    const b = document.getElementById(id);
-    if (b) b.onclick = () => { window.open("http://127.0.0.1:4173/outputs/MDM%E9%AB%98%E7%BA%A7%E6%9F%A5%E8%AF%A2%E5%B7%A5%E4%BD%9C%E5%8F%B0.html" + (location.search || ""), "_blank"); };
-  });
-  const wakeSmbBtn = document.getElementById("btnWakeSmbMount");
-  if (wakeSmbBtn) {
-    wakeSmbBtn.onclick = () => {
-      if (!shareUnc && !shareSmb) { toast("请先配置共享目录，或使用本地 Excel 导入", true); return; }
-      if (IS_WIN_CLIENT) {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(shareUnc).then(() => toast("已复制 Windows 共享路径：" + shareUnc + "，可在资源管理器地址栏粘贴打开"));
-        } else {
-          toast("Windows 共享路径：" + shareUnc);
-        }
-      } else {
-        if (!shareSmb) { toast("请先配置共享目录，或使用本地 Excel 导入", true); return; }
-        window.location.href = shareSmb;
-        toast("已唤起 macOS Finder 挂载内网共享目录：/Volumes/MDM示例表");
-      }
-    };
-  }
-  const copyCmdBtn = document.getElementById("btnCopyServeCmd");
-  if (copyCmdBtn) {
-    copyCmdBtn.onclick = () => {
-      const cmd = IS_WIN_CLIENT
-        ? "python scripts\\launch_workbench.py"
-        : 'python3 scripts/launch_workbench.py';
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(cmd).then(() => toast("已复制后台服务启动命令，粘贴到终端/CMD回车即可运行"));
-      } else {
-        toast("启动命令：" + cmd);
-      }
-    };
+  function renderConnection() {
+    const shareStatus = info && info.shareStatus;
+    const shareOpts = ((info && info.shareCandidates) || []).filter((c) => c.isShare);
+    const target = shareOpts[0] || (info && info.latestCandidate) || {};
+    const shareConnected = apiReady && shareStatus && shareStatus.overall === "connected";
+    const canUpdateShare = apiReady && !checking && !sourceError && !!target.path;
+    const statusText = checking ? "正在检查共享盘…" : sourceError ? "共享盘检查未完成" : !apiReady ? "本地服务未连接" : shareConnected ? "共享盘可用" : "共享盘待连接";
+    sharePanel.innerHTML = '<div class="source-card-head"><h4>' + ic("database", 14) + ' 共享盘更新 <span class="tag blue">推荐</span></h4>'
+      + '<span class="source-connection-state ' + (shareConnected && !checking ? "ok" : "warn") + '" role="status">' + esc(statusText) + '</span></div>'
+      + (shareOpts.length > 1 ? '<label class="source-file-meta" for="srcShareFileSelect">选择报表</label><select class="cfg-select source-share-select" id="srcShareFileSelect">'
+        + shareOpts.map((c) => '<option value="' + esc(c.path) + '">' + esc(c.name) + ' · ' + esc(c.mtime || '') + '</option>').join('') + '</select>'
+        : '<div class="source-file-name">' + esc(target.name || (checking ? '正在查找可用报表…' : '暂未找到可用报表')) + '</div>'
+          + (target.mtime ? '<span class="source-file-meta">报表时间 ' + esc(target.mtime) + '</span>' : ''))
+      + '<div class="source-action-row"><button class="tool-btn primary" id="btnRoute2Auto"' + (!canUpdateShare ? ' disabled' : '') + '>' + ic("refresh", 13) + ' 更新共享盘数据</button></div>'
+      + '<span class="source-file-meta">' + (checking ? '后台检查中，不影响本地文件导入。' : sourceError ? esc(sourceError) : !apiReady ? '请先双击项目中的「启动工作台」，再展开下方连接详情重新连接。' : !target.path ? '可在下方检查共享盘连接，或导入本地文件。' : '共享盘报表包含有效物料。') + '</span>';
+    document.getElementById("sourceConnectionDetails").innerHTML = checking
+      ? '<p role="status">正在后台检查共享盘连接与报表…</p>'
+      : sourceError
+        ? '<p role="status">' + esc(sourceError) + '</p><button class="mini-btn" id="btnRetryConnectApi">重新检查连接</button>'
+        : renderShareDiagCard(shareStatus, apiReady)
+          + '<dl class="source-paths"><dt>Windows 路径</dt><dd>' + esc(shareUnc) + '</dd><dt>macOS 地址</dt><dd>' + esc(shareSmb) + '</dd></dl>';
+    if (!checking && (!apiReady || sourceError)) document.getElementById("sourceAdvanced").open = true;
+    bindConnectionActions();
   }
 
-  const reprobeBtn = document.getElementById("btnReprobeShare");
-  if (reprobeBtn) {
-    reprobeBtn.onclick = async () => {
-      reprobeBtn.disabled = true;
-      reprobeBtn.textContent = "正在检测并挂载…";
+  async function refreshConnection(force = false) {
+    const version = ++connectionVersion;
+    const active = () => isCurrent() && version === connectionVersion;
+    checking = true; sourceError = "";
+    renderConnection();
+    const res = await resolveApiBase();
+    if (!active()) return;
+    apiBase = res.base; apiReady = !!res.info;
+    ["btnRoute1Pick", "btnRoute1Path"].forEach((id) => { document.getElementById(id).disabled = !apiReady; });
+    document.getElementById("sourceLocalStatus").textContent = apiReady ? "" : "本地服务未连接，请先运行「启动工作台」。";
+    if (apiReady) {
       try {
-        const r = await fetch(apiBase + "/api/mount-share", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({}),
+        const result = await loadSourceInfo(apiBase, force);
+        if (!active()) return;
+        info = result;
+        shareUnc = info.shareUnc || shareUnc;
+        shareSmb = info.shareSmb || shareSmb;
+      } catch (err) {
+        if (!active()) return;
+        sourceError = "共享盘检查未完成：" + err.message + "；可继续导入本地文件。";
+      }
+    }
+    if (!active()) return;
+    checking = false;
+    renderConnection();
+  }
+
+  function bindConnectionActions() {
+    ["btnRetryConnectApi"].forEach((id) => {
+      const b = document.getElementById(id);
+      if (b) b.onclick = () => refreshConnection(true);
+    });
+    ["btnOpenOnlineWorkbench"].forEach((id) => {
+      const b = document.getElementById(id);
+      if (b) b.onclick = () => { window.open("http://127.0.0.1:4173/outputs/MDM%E9%AB%98%E7%BA%A7%E6%9F%A5%E8%AF%A2%E5%B7%A5%E4%BD%9C%E5%8F%B0.html" + (location.search || ""), "_blank"); };
+    });
+    const wakeSmbBtn = document.getElementById("btnWakeSmbMount");
+    if (wakeSmbBtn) {
+      wakeSmbBtn.onclick = () => {
+        if (!shareUnc && !shareSmb) { toast("请先配置共享目录，或使用本地 Excel 导入", true); return; }
+        if (IS_WIN_CLIENT) {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(shareUnc).then(() => toast("已复制 Windows 共享路径：" + shareUnc + "，可在资源管理器地址栏粘贴打开"));
+          } else {
+            toast("Windows 共享路径：" + shareUnc);
+          }
+        } else {
+          if (!shareSmb) { toast("请先配置共享目录，或使用本地 Excel 导入", true); return; }
+          window.location.href = shareSmb;
+          toast("已唤起 macOS Finder 挂载内网共享目录：/Volumes/MDM示例表");
+        }
+      };
+    }
+    const copyCmdBtn = document.getElementById("btnCopyServeCmd");
+    if (copyCmdBtn) {
+      copyCmdBtn.onclick = () => {
+        const cmd = IS_WIN_CLIENT
+          ? "python scripts\\launch_workbench.py"
+          : 'python3 scripts/launch_workbench.py';
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(cmd).then(() => toast("已复制后台服务启动命令，粘贴到终端/CMD回车即可运行"));
+        } else {
+          toast("启动命令：" + cmd);
+        }
+      };
+    }
+
+    const reprobeBtn = document.getElementById("btnReprobeShare");
+    if (reprobeBtn) {
+      reprobeBtn.onclick = async () => {
+        reprobeBtn.disabled = true;
+        reprobeBtn.textContent = "正在检测并挂载…";
+        try {
+          const r = await fetch(apiBase + "/api/mount-share", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({}),
+          });
+          const res = await r.json();
+          if (res && res.shareStatus) {
+            updateShareStatusChip(res.shareStatus, true);
+            toast(res.shareStatus.statusLabel + "：" + (res.shareStatus.mount && res.shareStatus.mount.mountPoint || ""));
+          }
+          if (isCurrent()) await refreshConnection(true);
+        } catch (err) {
+          reprobeBtn.disabled = false;
+          reprobeBtn.textContent = "重新检测 / 一键挂载";
+          toast("检测失败：" + err.message, true);
+        }
+      };
+    }
+
+    document.getElementById("btnRoute2Auto").onclick = async () => {
+      if (!apiReady) {
+        toast("请双击运行「一键更新工作台.command」或通过 http://localhost:4173 访问以执行在线自动刷新", true);
+        return;
+      }
+      const btn = document.getElementById("btnRoute2Auto");
+      btn.disabled = true; btn.textContent = "正在扫描最新报表并重算 MDM + MPS 工艺路线…";
+      try {
+        const r = await fetch(apiBase + "/api/refresh-source", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(document.getElementById("srcShareFileSelect") ? { mode: "local_path", sourcePath: document.getElementById("srcShareFileSelect").value } : { mode: "auto_share" }),
         });
         const res = await r.json();
-        if (res && res.shareStatus) {
-          updateShareStatusChip(res.shareStatus, true);
-          toast(res.shareStatus.statusLabel + "：" + (res.shareStatus.mount && res.shareStatus.mount.mountPoint || ""));
-        }
-        openSourceModal();
+        if (!r.ok || !res.ok) throw new Error(res.error || "刷新失败");
+        toast("已导入最新报表：" + (res.meta && res.meta.source) + "，正在刷新页面…");
+        setTimeout(() => location.reload(), 600);
       } catch (err) {
-        reprobeBtn.disabled = false;
-        reprobeBtn.textContent = "重新检测 / 一键挂载";
-        toast("检测失败：" + err.message, true);
+        btn.disabled = false; btn.textContent = "更新共享盘数据";
+        toast("自动刷新失败：" + err.message, true);
       }
     };
   }
-
-  document.getElementById("btnRoute2Auto").onclick = async () => {
-    if (!apiReady) {
-      toast("请双击运行「一键更新工作台.command」或通过 http://localhost:4173 访问以执行在线自动刷新", true);
-      return;
-    }
-    const btn = document.getElementById("btnRoute2Auto");
-    btn.disabled = true; btn.textContent = "正在扫描最新报表并重算 MDM + MPS 工艺路线…";
-    try {
-      const r = await fetch(apiBase + "/api/refresh-source", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(document.getElementById("srcShareFileSelect") ? { mode: "local_path", sourcePath: document.getElementById("srcShareFileSelect").value } : { mode: "auto_share" }),
-      });
-      const res = await r.json();
-      if (!r.ok || !res.ok) throw new Error(res.error || "刷新失败");
-      toast("已导入最新报表：" + (res.meta && res.meta.source) + "，正在刷新页面…");
-      setTimeout(() => location.reload(), 600);
-    } catch (err) {
-      btn.disabled = false; btn.textContent = "更新共享盘数据";
-      toast("自动刷新失败：" + err.message, true);
-    }
-  };
 
   document.getElementById("btnRoute1Pick").onclick = () => {
     const inp = document.getElementById("excelUploadInput");
@@ -936,6 +1003,8 @@ async function openSourceModal() {
       toast("路径重建失败：" + err.message, true);
     }
   };
+  // 先显示完整弹窗和关闭按钮，再等待本地健康检查及共享盘扫描。
+  await refreshConnection();
 }
 
 /* ---------- 事件分发 ---------- */
@@ -2448,7 +2517,7 @@ async function init() {
   document.addEventListener("click", onClick);
   document.addEventListener("change", onChange);
   refreshAll();
-  resolveApiBase();
+  warmSourceInfo();
   document.getElementById("loading").classList.add("hide");
   if (deepLinkMiss) {
     toast("URL 指定的物料未找到：" + deepLinkMiss + "（可用物料编码或 V码）", true);
