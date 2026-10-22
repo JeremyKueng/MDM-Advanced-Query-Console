@@ -618,7 +618,9 @@ function renderCustomFilters() {
     const error = invalid ? '请输入有效日期，如 20260101' : range && c.val && c.valTo && isoDate(c.val) > isoDate(c.valTo) ? '结束日期不能早于开始日期' : '';
     return '<div class="custom-filter-row' + (range ? ' has-date-range' : '') + '">'
       + '<span class="tag blue" title="条件 ' + number + '">' + number + '</span>'
-      + '<select class="cfg-select custom-filter-field" data-act="custom-filter-field" data-idx="' + index + '" aria-label="条件 ' + number + ' 字段">' + buildFieldOptionsHtml(c.field) + '</select>'
+      + '<div class="custom-filter-field"><select hidden data-act="custom-filter-field" data-idx="' + index + '" aria-label="条件 ' + number + ' 字段">' + buildFieldOptionsHtml(c.field) + '</select>'
+      + '<button type="button" class="cfg-select custom-field-trigger" data-field-picker-open data-idx="' + index + '" aria-label="条件 ' + number + ' 字段：' + esc(schemaByKey.get(c.field)?.label || c.field) + '" aria-haspopup="dialog" aria-expanded="false" aria-controls="customFieldPicker">'
+      + '<span>' + esc(schemaByKey.get(c.field)?.label || c.field) + '</span>' + ic('chevron-down', 12) + '</button></div>'
       + '<select class="cfg-select custom-filter-op" data-act="custom-filter-op" data-idx="' + index + '" aria-label="条件 ' + number + ' 运算符">'
       + filterConditionOperators(c.field, c.op).map((o) => '<option value="' + o.op + '"' + (c.op === o.op ? ' selected' : '') + (o.legacy ? ' disabled' : '') + '>' + esc(o.label) + '</option>').join('') + '</select>'
       + (noValue ? '<span class="custom-filter-no-value">无需填写匹配值</span>' : range ? '<div class="custom-filter-range">' + input('val', '开始日期') + '<span>至</span>' + input('valTo', '结束日期') + '</div>' : input('val', date ? '日期' : '匹配值'))
@@ -634,6 +636,7 @@ function renderCustomFilters() {
 }
 
 function renderFilters() {
+  if (typeof closeCustomFieldPicker === "function") closeCustomFieldPicker();
   const f = state.filters;
   const customCount = activeCustomConditions().length;
   const previousCustomScroll = document.querySelector('#customFilterZone .custom-filter-list')?.scrollTop || 0;

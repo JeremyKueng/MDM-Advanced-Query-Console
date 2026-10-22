@@ -1050,6 +1050,134 @@ function focusSearchInput() {
   if (typeof searchDock !== "undefined" && searchDock) searchDock.focus();
   else document.getElementById("qInput").focus({ preventScroll: true });
 }
+// 字段搜索只筛选候选字段；通过原 select 的 change 复用条件和日期处理。
+let customFieldPicker = null;
+function matchingConditionFields(query) {
+  const normalize = (value) => String(value || '').normalize('NFKC').toLocaleLowerCase();
+  const words = normalize(query).trim().split(/\s+/).filter(Boolean);
+  const groups = new Map();
+  for (const key of schemaKeys) {
+    if (MDM_HIDDEN_KEYS.has(key)) continue;
+    const field = schemaByKey.get(key);
+    if (!words.every((word) => normalize(field.label + ' ' + field.key).includes(word))) continue;
+    if (!groups.has(field.group)) groups.set(field.group, []);
+    groups.get(field.group).push(field);
+  }
+  return [...groups.values()].flat();
+}
+function customFieldTrigger(index) {
+  return document.querySelector('[data-field-picker-open][data-idx="' + index + '"]');
+}
+function closeCustomFieldPicker(restoreFocus = false) {
+  if (!customFieldPicker) return;
+  const index = customFieldPicker.index;
+  document.getElementById('customFieldPicker')?.remove();
+  customFieldPicker = null;
+  const trigger = customFieldTrigger(index);
+  trigger?.setAttribute('aria-expanded', 'false');
+  if (restoreFocus) trigger?.focus({ preventScroll: true });
+}
+function setCustomFieldActive(index) {
+  const picker = customFieldPicker;
+  if (!picker) return;
+  picker.active = index;
+  const input = document.getElementById('customFieldSearch'), list = document.getElementById('customFieldOptions');
+  list.querySelectorAll('[data-field-choice]').forEach((option, i) => option.classList.toggle('is-active', i === index));
+  const active = list.querySelector('.is-active');
+  if (!active) { input.removeAttribute('aria-activedescendant'); return; }
+  input.setAttribute('aria-activedescendant', active.id);
+  // 只滚动候选列表，避免 scrollIntoView 带动主页面。
+  if (active.offsetTop < list.scrollTop) list.scrollTop = active.offsetTop;
+  else if (active.offsetTop + active.offsetHeight > list.scrollTop + list.clientHeight) list.scrollTop = active.offsetTop + active.offsetHeight - list.clientHeight;
+}
+function renderCustomFieldOptions(query = '') {
+  const picker = customFieldPicker;
+  if (!picker) return;
+  picker.matches = matchingConditionFields(query);
+  let group = null;
+  document.getElementById('customFieldOptions').innerHTML = picker.matches.map((field, index) => {
+    const heading = group !== field.group ? '<div class="custom-field-group" role="presentation">' + esc(field.group) + '</div>' : '';
+    group = field.group;
+    return heading + '<button type="button" class="custom-field-option" role="option" tabindex="-1" id="customFieldOption' + index + '" data-field-choice="' + esc(field.key) + '" aria-selected="' + (field.key === picker.select.value) + '"><span>'
+      + esc(field.label) + (field.label !== field.key ? '<small>' + esc(field.key) + '</small>' : '') + '</span>' + (field.key === picker.select.value ? ic('check', 13) : '') + '</button>';
+  }).join('') || '<div class="custom-field-empty">未找到匹配字段</div>';
+  document.getElementById('customFieldCount').textContent = query.trim() ? '找到 ' + picker.matches.length + ' 个字段' : '共 ' + picker.matches.length + ' 个字段';
+  document.getElementById('customFieldSearchClear').hidden = !query;
+  const selected = query ? 0 : picker.matches.findIndex((field) => field.key === picker.select.value);
+  setCustomFieldActive(Math.max(0, selected));
+}
+function openCustomFieldPicker(trigger) {
+  if (customFieldPicker?.index === trigger.dataset.idx) { closeCustomFieldPicker(true); return; }
+  closeCustomFieldPicker();
+  closeCustomDatePicker();
+  const index = trigger.dataset.idx;
+  // 先完成待生效的条件值，避免其延迟刷新关闭刚打开的字段列表。
+  if (customFilterTimer) { refreshCustomFilters(); trigger = customFieldTrigger(index); }
+  const select = trigger?.closest('.custom-filter-field').querySelector('select');
+  if (!select) return;
+  customFieldPicker = { index, select, active: 0, matches: [] };
+  const box = document.createElement('div');
+  box.id = 'customFieldPicker'; box.className = 'custom-field-picker';
+  box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', '搜索条件 ' + customConditionPathLabel(index) + ' 的字段');
+  box.innerHTML = '<div class="custom-field-search">' + ic('search', 14) + '<input id="customFieldSearch" type="text" placeholder="搜索字段名称或代码" autocomplete="off" role="combobox" aria-label="搜索字段名称或代码" aria-expanded="true" aria-controls="customFieldOptions" aria-autocomplete="list" aria-describedby="customFieldCount">'
+    + '<button type="button" id="customFieldSearchClear" aria-label="清空字段搜索" hidden>' + ic('x', 12) + '</button></div><div class="custom-field-count" id="customFieldCount" role="status" aria-live="polite"></div><div class="custom-field-options" id="customFieldOptions" role="listbox" aria-label="可选字段"></div>';
+  const rect = trigger.getBoundingClientRect(), width = Math.min(Math.max(rect.width, 300), window.innerWidth - 16);
+  const below = window.innerHeight - rect.bottom - 12, above = rect.top - 12;
+  const upward = below < 220 && above > below, height = Math.min(360, upward ? above : below);
+  box.style.width = width + 'px'; box.style.maxHeight = Math.max(100, height) + 'px';
+  box.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)) + 'px';
+  if (upward) box.style.bottom = window.innerHeight - rect.top + 5 + 'px';
+  else box.style.top = Math.max(8, rect.bottom + 5) + 'px';
+  document.body.appendChild(box);
+  trigger.setAttribute('aria-expanded', 'true');
+  renderCustomFieldOptions();
+  document.getElementById('customFieldSearch').focus({ preventScroll: true });
+}
+function chooseCustomField(key) {
+  const picker = customFieldPicker;
+  if (!picker || !picker.matches.some((field) => field.key === key)) return;
+  const { index, select } = picker;
+  closeCustomFieldPicker();
+  if (select.value !== key) { select.value = key; select.dispatchEvent(new Event('change', { bubbles: true })); }
+  customFieldTrigger(index)?.focus({ preventScroll: true });
+}
+function bindCustomFieldPickers() {
+  document.addEventListener('pointerdown', (e) => {
+    // 保留旧输入框到 click 时的状态，防止 blur/change 先重绘并吞掉点击。
+    if (e.target.closest('[data-field-picker-open]')) e.preventDefault();
+    else if (customFieldPicker && !e.target.closest('#customFieldPicker')) closeCustomFieldPicker();
+  });
+  document.addEventListener('click', (e) => {
+    const trigger = e.target.closest('[data-field-picker-open]');
+    const choice = e.target.closest('[data-field-choice]');
+    const clear = e.target.closest('#customFieldSearchClear');
+    if (!trigger && !choice && !clear) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    if (trigger) openCustomFieldPicker(trigger);
+    else if (choice) chooseCustomField(choice.dataset.fieldChoice);
+    else { const input = document.getElementById('customFieldSearch'); input.value = ''; renderCustomFieldOptions(); input.focus({ preventScroll: true }); }
+  }, true);
+  const search = (e) => { if (e.target.id === 'customFieldSearch' && !e.isComposing) renderCustomFieldOptions(e.target.value); };
+  document.addEventListener('input', search);
+  document.addEventListener('compositionend', search);
+  document.addEventListener('keydown', (e) => {
+    if (e.isComposing || e.keyCode === 229) return;
+    const trigger = e.target.closest('[data-field-picker-open]');
+    if (trigger && ['ArrowDown', 'ArrowUp'].includes(e.key)) { e.preventDefault(); e.stopImmediatePropagation(); openCustomFieldPicker(trigger); return; }
+    if (!customFieldPicker || !e.target.closest('#customFieldPicker')) return;
+    if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); closeCustomFieldPicker(true); }
+    else if (e.key === 'Tab') closeCustomFieldPicker(true);
+    else if (e.target.id === 'customFieldSearch' && ['ArrowDown', 'ArrowUp', 'Enter'].includes(e.key)) {
+      e.preventDefault(); e.stopImmediatePropagation();
+      const picker = customFieldPicker;
+      if (e.key === 'Enter') { const field = picker.matches[picker.active]; if (field) chooseCustomField(field.key); }
+      else if (picker.matches.length) setCustomFieldActive((picker.active + (e.key === 'ArrowDown' ? 1 : -1) + picker.matches.length) % picker.matches.length);
+    }
+  }, true);
+  document.addEventListener('focusin', (e) => { if (customFieldPicker && !e.target.closest('#customFieldPicker, [data-field-picker-open]')) closeCustomFieldPicker(); });
+  document.addEventListener('scroll', (e) => { if (customFieldPicker && !e.target.closest?.('#customFieldPicker')) closeCustomFieldPicker(); }, true);
+  window.addEventListener('resize', () => closeCustomFieldPicker());
+}
 let customFilterTimer = null;
 function queueCustomFilterValue(input, isComposing) {
   clearTimeout(customFilterTimer);
@@ -1059,13 +1187,16 @@ function queueCustomFilterValue(input, isComposing) {
   if (!condition) return;
   condition[input.dataset.part === "valTo" ? "valTo" : "val"] = input.value;
   customFilterTimer = setTimeout(() => {
+    customFilterTimer = null;
     if (input.dataset.dateInput && isoDate(input.value)) condition[input.dataset.part === "valTo" ? "valTo" : "val"] = isoDate(input.value);
     refreshCustomFilters();
   }, 220);
 }
 function refreshCustomFilters() {
+  closeCustomFieldPicker();
   closeCustomDatePicker();
   clearTimeout(customFilterTimer);
+  customFilterTimer = null;
   const active = document.activeElement;
   const control = active && active.closest("#customFilterZone") && active.matches("input, select") ? active : null;
   const action = control && control.dataset.act;
@@ -1424,7 +1555,7 @@ function onClick(e) {
       list.push(group ? { type: 'group', logic: parentLogic === 'OR' ? 'AND' : 'OR', conditions: [condition] } : condition);
       const path = (parent ? parent + '.' : '') + (list.length - 1) + (group ? '.0' : '');
       refreshCustomFilters();
-      const field = document.querySelector('[data-act="custom-filter-field"][data-idx="' + path + '"]');
+      const field = customFieldTrigger(path);
       if (field) {
         field.focus({ preventScroll: true });
         const viewport = field.closest('.custom-filter-list');
@@ -2513,6 +2644,7 @@ async function init() {
   bindQuickDetailConfig();
   bindDpConfigSorting();
   bindCustomDatePickers();
+  bindCustomFieldPickers();
   bindTableDragAndScrollGuard();
   /* 详情路径 .html/编码 为统一格式；旧 query/hash 入口在加载时替换为该路径。 */
   let deepLinkMiss = null;

@@ -250,6 +250,25 @@ main.page { overflow-anchor: none; }
 .custom-filter-row > .tag { font-size: 10.5px; padding: 1px 5px; }
 .custom-filter-row > .cfg-select, .custom-filter-row > .cfg-input { font-size: 11.5px; padding: 6px; }
 .custom-filter-row > .cfg-select, .custom-filter-row > .cfg-input { width: 100%; min-width: 0; }
+.custom-filter-field { min-width: 0; }
+.custom-field-trigger { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; min-width: 0; padding: 6px; font-size: 11.5px; text-align: left; cursor: pointer; }
+.custom-field-trigger > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.custom-field-trigger > svg { flex-shrink: 0; }
+.custom-field-trigger[aria-expanded="true"] { border-color: var(--blue); box-shadow: 0 0 0 2px #2d7ff91c; }
+.custom-field-picker { position: fixed; z-index: 120; display: flex; flex-direction: column; padding: 8px; border: 1px solid #c4d8f2; background: #fff; box-shadow: 0 8px 28px #10253f26; border-radius: 9px; }
+.custom-field-search { display: flex; align-items: center; gap: 6px; flex-shrink: 0; padding: 0 8px; border: 1px solid var(--blue); border-radius: 6px; color: var(--muted); }
+.custom-field-search input { width: 100%; min-width: 0; border: 0; outline: none; background: transparent; color: var(--ink); padding: 9px 0; font-size: 12px; }
+.custom-field-search button { border: 0; background: transparent; color: var(--muted); padding: 2px; cursor: pointer; }
+.custom-field-picker [hidden] { display: none; }
+.custom-field-count { padding: 7px 4px 3px; color: var(--subtle); font-size: 11px; }
+.custom-field-options { position: relative; overflow-y: auto; min-height: 0; overscroll-behavior: contain; }
+.custom-field-group { padding: 8px 8px 4px; color: var(--subtle); font-size: 11px; }
+.custom-field-option { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px; border: 0; border-radius: 5px; background: #fff; color: var(--ink); font-size: 12px; text-align: left; cursor: pointer; }
+.custom-field-option > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.custom-field-option small { display: block; color: var(--muted); font-size: 10.5px; margin-top: 2px; }
+.custom-field-option.is-active, .custom-field-option:hover { background: var(--blue-soft); color: var(--blue-deep); }
+.custom-field-option[aria-selected="true"] { font-weight: 650; }
+.custom-field-empty { padding: 18px 8px; color: var(--muted); font-size: 12px; text-align: center; }
 .custom-filter-no-value, .custom-filter-hint { color: var(--subtle); font-size: 11.5px; }
 .custom-filter-hint { margin-top: 5px; }
 .custom-filter-relation { font-size: 11px; color: var(--blue-deep); white-space: nowrap; }
