@@ -109,6 +109,8 @@ mark { background: #ffe9a8; color: inherit; padding: 0 1px; border-radius: 2px; 
 .tabbar .cnt { font-size: 11px; font-weight: 600; border-radius: 999px; padding: 1px 8px; background: #eef3f8; color: var(--muted); font-variant-numeric: tabular-nums; }
 .tabbar button.on .cnt { background: rgba(255,255,255,.25); color: #fff; }
 @media(max-width:900px){.tabbar{flex-wrap:wrap;overflow-x:visible;}.tabbar-main{flex-basis:100%;}.tabbar-special{border-left:0;border-top:1px dashed var(--line);padding:4px 0 0;flex-basis:100%;margin-left:0;}.tabbar-special button{min-height:34px;}}
+html { scrollbar-gutter: stable; }
+main.page { overflow-anchor: none; }
 .tabpanel { display: none; }
 .tabpanel.on { display: block; }
 
@@ -238,7 +240,11 @@ mark { background: #ffe9a8; color: inherit; padding: 0 1px; border-radius: 2px; 
 .custom-filter-head > b { color: var(--blue-deep); display: inline-flex; align-items: center; gap: 5px; }
 .custom-filter-actions { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
 .custom-filter-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--muted); font-size: 11.5px; margin-bottom: 4px; }
-.custom-filter-list { max-height: 190px; overflow-y: auto; overscroll-behavior: contain; }
+.custom-filter-list { max-height: min(420px, 50vh); overflow-y: auto; overscroll-behavior: contain; }
+.custom-filter-group { border: 1px solid #c7dcf6; border-left: 3px solid #83b1ee; border-radius: 7px; background: rgba(255,255,255,.65); padding: 7px 9px; margin: 6px 0; }
+.custom-group-head { display: flex; gap: 7px; flex-wrap: wrap; align-items: center; margin-bottom: 3px; font-size: 11.5px; color: var(--blue-deep); }
+.custom-group-head > .cfg-select { font-size: 11.5px; padding: 5px 6px; max-width: 165px; }
+.custom-group-head .mini-btn { padding: 4px 6px; font-size: 11px; }
 .custom-filter-list:empty { display: none; }
 .custom-filter-row { display: grid; grid-template-columns: auto minmax(0, 1.2fr) minmax(0, .9fr) minmax(0, 1fr) auto; align-items: center; gap: 6px; padding: 4px 0; }
 .custom-filter-row > .tag { font-size: 10.5px; padding: 1px 5px; }

@@ -568,10 +568,9 @@ function buildActiveFilterLinkageTags(sizeCls, includeSearch = true, includeStat
   if (customCount) {
     tags.push('<span class="custom-filter-relation">自定义·' + (f.customLogic === "OR" ? "任一满足" : "全部满足") + '：</span>');
     (f.customConditions || []).forEach((c, index) => {
-      const op = filterConditionOperators(c.field, c.op).find((o) => o.op === c.op);
-      if (!op || !schemaByKey.has(c.field) || !customConditionReady(c) || MDM_HIDDEN_KEYS.has(c.field)) return;
-      const label = schemaByKey.get(c.field).label + " " + op.label + (["empty", "notEmpty"].includes(c.op) ? "" : " " + customConditionValueLabel(c));
-      tags.push('<button class="fchip ' + cls + ' on custom-filter-summary" data-act="custom-filter-del" data-idx="' + index + '" title="移除条件：' + esc(label) + '">' + esc(label) + ' ✕</button>');
+      const label = customFilterNodeLabel(c);
+      if (!label) return;
+      tags.push('<button class="fchip ' + cls + ' on custom-filter-summary" data-act="custom-filter-del" data-idx="' + index + '" title="移除' + (c.type === 'group' ? '整个条件组' : '条件') + '：' + esc(label) + '">' + esc(label) + ' ✕</button>');
     });
   }
   return tags;
@@ -594,46 +593,44 @@ function renderScopeLinkageBar(panelTitle, extraRightHtml) {
     + '</div>';
 }
 function renderCustomFilters() {
-  const f = state.filters;
-  const conditions = f.customConditions || [];
-  const activeCount = activeCustomConditions().length;
-  let h = '<div class="fzone custom-filter-zone" id="customFilterZone">'
-    + '<div class="custom-filter-head"><b>' + ic("filter", 13) + ' 自定义条件配置</b>'
-    + '<span class="tag blue">' + activeCount + ' 条生效</span><div class="custom-filter-actions">'
-    + (conditions.length ? '<button class="mini-btn" data-act="custom-filter-clear">清空</button>' : '')
-    + '<button class="mini-btn primary" data-act="custom-filter-add">' + ic("plus", 12) + ' 添加条件</button></div></div>';
-  if (conditions.length) {
-    h += '<div class="custom-filter-controls"><span>保留满足</span><select class="cfg-select" data-act="custom-filter-logic" aria-label="自定义条件关系">'
-      + '<option value="AND"' + (f.customLogic !== "OR" ? " selected" : "") + '>全部条件 (AND)</option>'
-      + '<option value="OR"' + (f.customLogic === "OR" ? " selected" : "") + '>任一条件 (OR)</option></select><span>的物料</span></div>';
-  }
-  h += '<div class="custom-filter-list">';
-  conditions.forEach((c, index) => {
+  const f = state.filters, conditions = f.customConditions || [];
+  const relation = (logic, path) => '<select class="cfg-select" data-act="' + (path ? 'custom-filter-group-logic' : 'custom-filter-logic') + '" data-idx="' + path + '" aria-label="' + (path ? '条件组 ' + customConditionPathLabel(path) + ' 关系' : '自定义条件关系') + '">'
+    + '<option value="AND"' + (logic !== 'OR' ? ' selected' : '') + '>全部满足 (AND)</option><option value="OR"' + (logic === 'OR' ? ' selected' : '') + '>任一满足 (OR)</option></select>';
+  const add = (parent, group, label) => '<button type="button" class="mini-btn" data-act="' + (group ? 'custom-filter-add-group' : 'custom-filter-add') + '" data-parent="' + parent + '">' + ic('plus', 11) + ' ' + label + '</button>';
+  const renderItems = (items, parent = '') => items.map((c, offset) => {
+    const index = parent ? parent + '.' + offset : String(offset), number = customConditionPathLabel(index);
+    if (c.type === 'group') return '<div class="custom-filter-group" role="group" aria-label="条件组 ' + number + '"><div class="custom-group-head"><b>条件组 ' + number + '</b>' + relation(c.logic, index)
+      + '<div class="custom-filter-actions">' + add(index, false, '条件') + add(index, true, '条件组')
+      + '<button type="button" class="mini-btn danger" data-act="custom-filter-del" data-idx="' + index + '" aria-label="删除条件组 ' + number + '">' + ic('x', 12) + '</button></div></div>'
+      + renderItems(c.conditions, index) + (!c.conditions.length ? '<span class="custom-filter-no-value">空条件组暂不参与筛选</span>' : '') + '</div>';
     const noValue = c.op === "empty" || c.op === "notEmpty";
     const date = isDateField(c.field), range = date && c.op === "between";
     const legacy = date && !DATE_OPERATORS.some((o) => o.op === c.op);
     const input = (part, label) => {
       const picker = date && !legacy;
       const attrs = ' data-idx="' + index + '" data-part="' + part + '"';
-      const field = '<input type="text" class="cfg-input custom-filter-value" data-act="custom-filter-value"' + attrs + ' aria-label="条件 ' + (index + 1) + ' ' + label + '" value="' + esc(c[part] || '') + '"'
+      const field = '<input type="text" class="cfg-input custom-filter-value" data-act="custom-filter-value"' + attrs + ' aria-label="条件 ' + number + ' ' + label + '" value="' + esc(c[part] || '') + '"'
         + (picker ? ' data-date-input="true" inputmode="numeric" maxlength="10" placeholder="20260101" title="输入 YYYYMMDD 或 YYYY-MM-DD，也可点日历选日期"' : '')
-        + (legacy ? ' readonly title="原文本条件已保留，请切换运算符使用日期筛选"' : '') + (!date ? ' placeholder="' + (c.op === 'in' ? '多项用逗号分隔' : '输入匹配值') + '"' : '') + '>';
-      return picker ? '<div class="custom-date">' + field + '<button type="button" data-date-action="open"' + attrs + ' aria-label="打开条件 ' + (index + 1) + ' ' + label + '日历" aria-haspopup="dialog" aria-expanded="false">' + ic("calendar", 14) + '</button></div>' : field;
+        + (legacy ? ' readonly title="原文本条件已保留，请切换运算符使用日期筛选"' : '') + (!date ? ' placeholder="' + (c.op === 'containsAny' ? '如：面巾；餐巾（任一项匹配）' : c.op === 'in' ? '多项用逗号分隔' : '输入匹配值') + '"' : '') + '>';
+      return picker ? '<div class="custom-date">' + field + '<button type="button" data-date-action="open"' + attrs + ' aria-label="打开条件 ' + number + ' ' + label + '日历" aria-haspopup="dialog" aria-expanded="false">' + ic("calendar", 14) + '</button></div>' : field;
     };
     const invalid = date && !legacy && !noValue && [c.val, ...(range ? [c.valTo] : [])].some((v) => v && !isoDate(v));
     const error = invalid ? '请输入有效日期，如 20260101' : range && c.val && c.valTo && isoDate(c.val) > isoDate(c.valTo) ? '结束日期不能早于开始日期' : '';
-    h += '<div class="custom-filter-row' + (range ? ' has-date-range' : '') + '">'
-      + '<span class="tag blue" title="条件 ' + (index + 1) + '">' + (index + 1) + '</span>'
-      + '<select class="cfg-select custom-filter-field" data-act="custom-filter-field" data-idx="' + index + '" aria-label="条件 ' + (index + 1) + ' 字段">' + buildFieldOptionsHtml(c.field) + '</select>'
-      + '<select class="cfg-select custom-filter-op" data-act="custom-filter-op" data-idx="' + index + '" aria-label="条件 ' + (index + 1) + ' 运算符">'
+    return '<div class="custom-filter-row' + (range ? ' has-date-range' : '') + '">'
+      + '<span class="tag blue" title="条件 ' + number + '">' + number + '</span>'
+      + '<select class="cfg-select custom-filter-field" data-act="custom-filter-field" data-idx="' + index + '" aria-label="条件 ' + number + ' 字段">' + buildFieldOptionsHtml(c.field) + '</select>'
+      + '<select class="cfg-select custom-filter-op" data-act="custom-filter-op" data-idx="' + index + '" aria-label="条件 ' + number + ' 运算符">'
       + filterConditionOperators(c.field, c.op).map((o) => '<option value="' + o.op + '"' + (c.op === o.op ? ' selected' : '') + (o.legacy ? ' disabled' : '') + '>' + esc(o.label) + '</option>').join('') + '</select>'
       + (noValue ? '<span class="custom-filter-no-value">无需填写匹配值</span>' : range ? '<div class="custom-filter-range">' + input('val', '开始日期') + '<span>至</span>' + input('valTo', '结束日期') + '</div>' : input('val', date ? '日期' : '匹配值'))
-      + '<button class="mini-btn danger" data-act="custom-filter-del" data-idx="' + index + '" aria-label="删除条件 ' + (index + 1) + '">' + ic("x", 12) + '</button>'
+      + '<button class="mini-btn danger" data-act="custom-filter-del" data-idx="' + index + '" aria-label="删除条件 ' + number + '">' + ic("x", 12) + '</button>'
       + (error ? '<span class="custom-filter-error" role="alert">' + error + '</span>' : '') + '</div>';
-  });
-  h += '</div><div class="custom-filter-hint">' + (conditions.length ? '完整日期自动生效，支持手输 20260101；区间包含起止当天，“为空”包含空值和“无”。' : '按任意字段添加条件，可选择全部满足或任一满足。')
-    + '</div></div>';
-  return h;
+  }).join('');
+  return '<div class="fzone custom-filter-zone" id="customFilterZone">'
+    + '<div class="custom-filter-head"><b>' + ic('filter', 13) + ' 自定义条件配置</b><span class="tag blue">' + activeCustomConditions().length + ' 条生效</span><div class="custom-filter-actions">'
+    + (conditions.length ? '<button class="mini-btn" data-act="custom-filter-clear">清空</button>' : '') + add('', false, '添加条件') + add('', true, '添加条件组') + '</div></div>'
+    + '<div class="custom-filter-controls"><span>保留满足</span>' + relation(f.customLogic, '') + '<span>的物料</span></div>'
+    + '<div class="custom-filter-list">' + renderItems(conditions) + '</div>'
+    + '<div class="custom-filter-hint">条件组可交替嵌套 AND / OR；“包含任一项”用 ; 或 ；分隔。日期支持手输 20260101，空条件暂不生效。</div></div>';
 }
 
 function renderFilters() {

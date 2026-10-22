@@ -109,6 +109,8 @@ mark { background: #ffe9a8; color: inherit; padding: 0 1px; border-radius: 2px; 
 .tabbar .cnt { font-size: 11px; font-weight: 600; border-radius: 999px; padding: 1px 8px; background: #eef3f8; color: var(--muted); font-variant-numeric: tabular-nums; }
 .tabbar button.on .cnt { background: rgba(255,255,255,.25); color: #fff; }
 @media(max-width:900px){.tabbar{flex-wrap:wrap;overflow-x:visible;}.tabbar-main{flex-basis:100%;}.tabbar-special{border-left:0;border-top:1px dashed var(--line);padding:4px 0 0;flex-basis:100%;margin-left:0;}.tabbar-special button{min-height:34px;}}
+html { scrollbar-gutter: stable; }
+main.page { overflow-anchor: none; }
 .tabpanel { display: none; }
 .tabpanel.on { display: block; }
 
@@ -238,7 +240,11 @@ mark { background: #ffe9a8; color: inherit; padding: 0 1px; border-radius: 2px; 
 .custom-filter-head > b { color: var(--blue-deep); display: inline-flex; align-items: center; gap: 5px; }
 .custom-filter-actions { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
 .custom-filter-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--muted); font-size: 11.5px; margin-bottom: 4px; }
-.custom-filter-list { max-height: 190px; overflow-y: auto; overscroll-behavior: contain; }
+.custom-filter-list { max-height: min(420px, 50vh); overflow-y: auto; overscroll-behavior: contain; }
+.custom-filter-group { border: 1px solid #c7dcf6; border-left: 3px solid #83b1ee; border-radius: 7px; background: rgba(255,255,255,.65); padding: 7px 9px; margin: 6px 0; }
+.custom-group-head { display: flex; gap: 7px; flex-wrap: wrap; align-items: center; margin-bottom: 3px; font-size: 11.5px; color: var(--blue-deep); }
+.custom-group-head > .cfg-select { font-size: 11.5px; padding: 5px 6px; max-width: 165px; }
+.custom-group-head .mini-btn { padding: 4px 6px; font-size: 11px; }
 .custom-filter-list:empty { display: none; }
 .custom-filter-row { display: grid; grid-template-columns: auto minmax(0, 1.2fr) minmax(0, .9fr) minmax(0, 1fr) auto; align-items: center; gap: 6px; padding: 4px 0; }
 .custom-filter-row > .tag { font-size: 10.5px; padding: 1px 5px; }
@@ -1475,9 +1481,12 @@ const DATE_OPERATORS = [
   { op: "between", label: "日期区间（含起止）" },
   { op: "notEmpty", label: "不为空" }, { op: "empty", label: "为空" },
 ];
+const CUSTOM_TEXT_OPERATORS = [...DP_OPERATORS.slice(0, 3), { op: "containsAny", label: "包含任一项 (OR)" }, ...DP_OPERATORS.slice(3)];
+const CUSTOM_MAX_DEPTH = 8, CUSTOM_MAX_NODES = 200;
+function splitCustomValues(value) { return [...new Set(String(value || "").split(/[;；\r\n]+/).map((v) => v.trim().toLowerCase()).filter(Boolean))]; }
 function isDateField(key) { return ["created", "updated"].includes(key) || (schemaByKey.get(key) || {}).type === "date"; }
 function filterConditionOperators(key, currentOp) {
-  if (!isDateField(key)) return DP_OPERATORS;
+  if (!isDateField(key)) return CUSTOM_TEXT_OPERATORS;
   const old = DP_OPERATORS.find((o) => o.op === currentOp);
   return old && !DATE_OPERATORS.some((o) => o.op === currentOp) ? [...DATE_OPERATORS, { ...old, label: "原文本条件：" + old.label, legacy: true }] : DATE_OPERATORS;
 }
@@ -1492,6 +1501,7 @@ function isoDate(value) {
 }
 function customConditionReady(c) {
   if (!c) return false;
+  if (c.op === "containsAny") return splitCustomValues(c.val).length > 0;
   if (["empty", "notEmpty"].includes(c.op)) return true;
   if (!String(c.val == null ? "" : c.val).trim()) return false;
   if (!isDateField(c.field) || !DATE_OPERATORS.some((o) => o.op === c.op)) return true;
@@ -1731,6 +1741,7 @@ function evalDpCondition(r, cond) {
     case "eq": return sv.toLowerCase() === target.toLowerCase();
     case "neq": return sv.toLowerCase() !== target.toLowerCase();
     case "contains": return target !== "" && sv.toLowerCase().includes(target.toLowerCase());
+    case "containsAny": return splitCustomValues(target).some((value) => sv.toLowerCase().includes(value));
     case "notContains": return target === "" || !sv.toLowerCase().includes(target.toLowerCase());
     case "in": {
       const set = new Set(target.split(/[,，;；|\s]+/).map((x) => x.trim().toLowerCase()).filter(Boolean));
@@ -1743,23 +1754,92 @@ function evalDpCondition(r, cond) {
 }
 
 /* 查询条件沿用详情模板的字段、运算符与“无”值口径；未填完的条件暂不参与筛选。 */
-function normalizeCustomConditions(conditions) {
-  if (!Array.isArray(conditions)) return [];
-  return conditions.filter((c) => c && schemaByKey.has(c.field) && !MDM_HIDDEN_KEYS.has(c.field)
-    && filterConditionOperators(c.field, c.op).some((o) => o.op === c.op))
-    .map((c) => ({ field: c.field, op: c.op, val: String(c.val == null ? "" : c.val).trim(),
-      ...(c.op === "between" ? { valTo: String(c.valTo == null ? "" : c.valTo).trim() } : {}) }));
+function validateCustomConditions(conditions) {
+  let count = 0;
+  function check(items, depth) {
+    if (!Array.isArray(items) || depth > CUSTOM_MAX_DEPTH) throw new Error("条件组格式不正确或嵌套过深");
+    for (const c of items) {
+      if (++count > CUSTOM_MAX_NODES || !c || typeof c !== "object" || Array.isArray(c)) throw new Error("条件配置格式不正确或数量过多");
+      if (c.type === "group") {
+        if (!["AND", "OR"].includes(c.logic)) throw new Error("条件组必须选择 AND 或 OR");
+        check(c.conditions, depth + 1);
+      } else if ((c.type && c.type !== "condition") || typeof c.field !== "string" || typeof c.op !== "string") throw new Error("条件配置格式不正确");
+    }
+  }
+  check(conditions, 0);
 }
-function activeCustomConditions() { return normalizeCustomConditions(state.filters.customConditions).filter(customConditionReady); }
+function normalizeCustomConditions(conditions) {
+  let count = 0;
+  function clean(items, depth) {
+    if (!Array.isArray(items) || depth > CUSTOM_MAX_DEPTH) return [];
+    const result = [];
+    for (const c of items) {
+      if (++count > CUSTOM_MAX_NODES) break;
+      if (!c || typeof c !== "object") continue;
+      if (c.type === "group") {
+        result.push({ type: "group", logic: c.logic === "OR" ? "OR" : "AND", conditions: clean(c.conditions, depth + 1) });
+      } else if (schemaByKey.has(c.field) && !MDM_HIDDEN_KEYS.has(c.field) && filterConditionOperators(c.field, c.op).some((o) => o.op === c.op)) {
+        result.push({ field: c.field, op: c.op, val: String(c.val == null ? "" : c.val).trim(),
+          ...(c.op === "between" ? { valTo: String(c.valTo == null ? "" : c.valTo).trim() } : {}) });
+      }
+    }
+    return result;
+  }
+  return clean(conditions, 0);
+}
+function customFilterEntries(items = state.filters.customConditions, parent = "") {
+  const result = [];
+  for (const [index, node] of (items || []).entries()) {
+    const path = parent ? parent + "." + index : String(index);
+    result.push({ node, path });
+    if (node.type === "group") result.push(...customFilterEntries(node.conditions, path));
+  }
+  return result;
+}
+function customFilterNode(path) {
+  if (!/^\d+(?:\.\d+)*$/.test(String(path))) return null;
+  let list = state.filters.customConditions, node;
+  for (const part of String(path).split(".")) {
+    node = list && list[Number(part)];
+    if (!node) return null;
+    list = node.type === "group" ? node.conditions : null;
+  }
+  return node;
+}
+function customFilterChildren(path = "") {
+  if (path === "") return state.filters.customConditions;
+  const node = customFilterNode(path);
+  return node && node.type === "group" ? node.conditions : null;
+}
+function customConditionPathLabel(path) { return String(path).split(".").map((p) => Number(p) + 1).join("."); }
+function activeCustomConditions() { return customFilterEntries(normalizeCustomConditions(state.filters.customConditions)).filter(({ node }) => node.type !== "group" && customConditionReady(node)).map(({ node }) => node); }
+function activeCustomTree(items = normalizeCustomConditions(state.filters.customConditions), logic = state.filters.customLogic) {
+  const children = items.map((c) => c.type === "group" ? activeCustomTree(c.conditions, c.logic) : customConditionReady(c) ? c : null).filter(Boolean);
+  return children.length ? { type: "group", logic: logic === "OR" ? "OR" : "AND", conditions: children } : null;
+}
+function customFilterNodeLabel(c) {
+  if (c.type === "group") {
+    const labels = c.conditions.map(customFilterNodeLabel).filter(Boolean);
+    return labels.length ? "（" + labels.join(c.logic === "OR" ? " 或 " : " 且 ") + "）" : "";
+  }
+  const field = schemaByKey.get(c.field), op = filterConditionOperators(c.field, c.op).find((o) => o.op === c.op);
+  return field && op && customConditionReady(c) ? field.label + " " + op.label + (["empty", "notEmpty"].includes(c.op) ? "" : " " + customConditionValueLabel(c)) : "";
+}
 function prepareCustomFilterMatches() {
-  const conditions = activeCustomConditions();
+  const tree = activeCustomTree();
   state._customMatches = null;
-  if (!conditions.length) return;
-  const any = state.filters.customLogic === "OR";
+  if (!tree) return;
+  const compile = (c) => {
+    if (c.type !== "group") {
+      if (c.op === "containsAny") { const values = splitCustomValues(c.val); return (r) => values.some((v) => String(r[c.field] ?? "").toLowerCase().includes(v)); }
+      return (r) => evalDpCondition(r, c);
+    }
+    const tests = c.conditions.map(compile);
+    return c.logic === "OR" ? (r) => tests.some((test) => test(r)) : (r) => tests.every((test) => test(r));
+  };
+  const match = compile(tree);
   // 每次查询只计算一次，供各分类胶囊的联动计数共用。
-  state._customMatches = new Set(rows.filter((r) => any
-    ? conditions.some((c) => evalDpCondition(r, c))
-    : conditions.every((c) => evalDpCondition(r, c))).map((r) => r.material));
+  state._customMatches = new Set(rows.filter(match).map((r) => r.material));
 }
 
 function matchDpTemplateForSku(r) {
@@ -4003,7 +4083,7 @@ function normalizeQuickDetailView(view) {
 function captureUserSettings() {
   const f = state.filters;
   return {
-    v: 6, view: state.view, tab: state.tab, order: [...state.order], visible: orderedVisibleKeys(),
+    v: 7, view: state.view, tab: state.tab, order: [...state.order], visible: orderedVisibleKeys(),
     savedViews: state.savedViews, activeFieldView: state.activeFieldView, viewShortcuts: state.viewShortcuts,
     q: state.q, qMode: state.qMode, qField: state.qField, filterCollapsed: state.filterCollapsed, queryUiVersion: 1,
     queryViews: state.queryViews, activeQueryView: state.activeQueryView,
@@ -4023,7 +4103,7 @@ function decodeUserConfig(doc) {
     if (doc.schemaVersion !== 1) throw new Error("配置格式版本暂不支持，请保留原文件");
     s = doc.settings;
   } else if (doc.type && doc.type !== "wb_mdm_advq_backup") throw new Error("不是工作台个人配置文件");
-  if (!s || !Number.isInteger(s.v) || s.v < 1 || s.v > 6) throw new Error("配置版本无效或暂不支持");
+  if (!s || !Number.isInteger(s.v) || s.v < 1 || s.v > 7) throw new Error("配置版本无效或暂不支持");
   const arrayKeys = ["order", "visible", "basket", "expandedMore", "viewShortcuts"];
   for (const k of arrayKeys) if (k in s && (!Array.isArray(s[k]) || s[k].some((x) => typeof x !== "string"))) throw new Error(k + " 配置格式不正确");
   if (s.filters && (typeof s.filters !== "object" || Array.isArray(s.filters))) throw new Error("筛选配置格式不正确");
@@ -4036,7 +4116,7 @@ function decodeUserConfig(doc) {
   const checkConditions = (items) => {
     if (items !== undefined && (!Array.isArray(items) || items.some((c) => !c || typeof c.field !== "string" || typeof c.op !== "string"))) throw new Error("条件配置格式不正确");
   };
-  if (s.filters) checkConditions(s.filters.customConditions);
+  if (s.filters && s.filters.customConditions !== undefined) validateCustomConditions(s.filters.customConditions);
   for (const t of s.dpTemplates || []) {
     checkConditions(t.conditions);
     for (const b of t.blocks) {
@@ -4303,7 +4383,7 @@ function validateQueryViews(views) {
     if (!c.sort || typeof c.sort.key !== "string" || ![1, -1].includes(c.sort.dir) || !["table", "card"].includes(c.view)) throw new Error("我的查询展示配置无效");
     if (!c.filters || typeof c.filters !== "object" || Array.isArray(c.filters)) throw new Error("我的查询筛选配置无效");
     for (const k of ["mfg", "formula", "cats", "stocks", "brands"]) if (!Array.isArray(c.filters[k]) || c.filters[k].some((x) => typeof x !== "string")) throw new Error("我的查询分类筛选无效");
-    if (!Array.isArray(c.filters.customConditions) || c.filters.customConditions.some((x) => !x || typeof x.field !== "string" || typeof x.op !== "string")) throw new Error("我的查询自定义条件无效");
+    validateCustomConditions(c.filters.customConditions);
     for (const k of ["status", "pre", "scope", "onlyFieldIssue", "onlyPdfRule"]) if (typeof c.filters[k] !== "string") throw new Error("我的查询状态筛选无效");
     for (const k of ["onlyBlock", "onlyIssue", "onlyVconf", "onlyBasket", "onlyPdf"]) if (typeof c.filters[k] !== "boolean") throw new Error("我的查询质量筛选无效");
     if (!["AND", "OR"].includes(c.filters.customLogic)) throw new Error("我的查询条件关系无效");
@@ -4959,10 +5039,9 @@ function buildActiveFilterLinkageTags(sizeCls, includeSearch = true, includeStat
   if (customCount) {
     tags.push('<span class="custom-filter-relation">自定义·' + (f.customLogic === "OR" ? "任一满足" : "全部满足") + '：</span>');
     (f.customConditions || []).forEach((c, index) => {
-      const op = filterConditionOperators(c.field, c.op).find((o) => o.op === c.op);
-      if (!op || !schemaByKey.has(c.field) || !customConditionReady(c) || MDM_HIDDEN_KEYS.has(c.field)) return;
-      const label = schemaByKey.get(c.field).label + " " + op.label + (["empty", "notEmpty"].includes(c.op) ? "" : " " + customConditionValueLabel(c));
-      tags.push('<button class="fchip ' + cls + ' on custom-filter-summary" data-act="custom-filter-del" data-idx="' + index + '" title="移除条件：' + esc(label) + '">' + esc(label) + ' ✕</button>');
+      const label = customFilterNodeLabel(c);
+      if (!label) return;
+      tags.push('<button class="fchip ' + cls + ' on custom-filter-summary" data-act="custom-filter-del" data-idx="' + index + '" title="移除' + (c.type === 'group' ? '整个条件组' : '条件') + '：' + esc(label) + '">' + esc(label) + ' ✕</button>');
     });
   }
   return tags;
@@ -4985,46 +5064,44 @@ function renderScopeLinkageBar(panelTitle, extraRightHtml) {
     + '</div>';
 }
 function renderCustomFilters() {
-  const f = state.filters;
-  const conditions = f.customConditions || [];
-  const activeCount = activeCustomConditions().length;
-  let h = '<div class="fzone custom-filter-zone" id="customFilterZone">'
-    + '<div class="custom-filter-head"><b>' + ic("filter", 13) + ' 自定义条件配置</b>'
-    + '<span class="tag blue">' + activeCount + ' 条生效</span><div class="custom-filter-actions">'
-    + (conditions.length ? '<button class="mini-btn" data-act="custom-filter-clear">清空</button>' : '')
-    + '<button class="mini-btn primary" data-act="custom-filter-add">' + ic("plus", 12) + ' 添加条件</button></div></div>';
-  if (conditions.length) {
-    h += '<div class="custom-filter-controls"><span>保留满足</span><select class="cfg-select" data-act="custom-filter-logic" aria-label="自定义条件关系">'
-      + '<option value="AND"' + (f.customLogic !== "OR" ? " selected" : "") + '>全部条件 (AND)</option>'
-      + '<option value="OR"' + (f.customLogic === "OR" ? " selected" : "") + '>任一条件 (OR)</option></select><span>的物料</span></div>';
-  }
-  h += '<div class="custom-filter-list">';
-  conditions.forEach((c, index) => {
+  const f = state.filters, conditions = f.customConditions || [];
+  const relation = (logic, path) => '<select class="cfg-select" data-act="' + (path ? 'custom-filter-group-logic' : 'custom-filter-logic') + '" data-idx="' + path + '" aria-label="' + (path ? '条件组 ' + customConditionPathLabel(path) + ' 关系' : '自定义条件关系') + '">'
+    + '<option value="AND"' + (logic !== 'OR' ? ' selected' : '') + '>全部满足 (AND)</option><option value="OR"' + (logic === 'OR' ? ' selected' : '') + '>任一满足 (OR)</option></select>';
+  const add = (parent, group, label) => '<button type="button" class="mini-btn" data-act="' + (group ? 'custom-filter-add-group' : 'custom-filter-add') + '" data-parent="' + parent + '">' + ic('plus', 11) + ' ' + label + '</button>';
+  const renderItems = (items, parent = '') => items.map((c, offset) => {
+    const index = parent ? parent + '.' + offset : String(offset), number = customConditionPathLabel(index);
+    if (c.type === 'group') return '<div class="custom-filter-group" role="group" aria-label="条件组 ' + number + '"><div class="custom-group-head"><b>条件组 ' + number + '</b>' + relation(c.logic, index)
+      + '<div class="custom-filter-actions">' + add(index, false, '条件') + add(index, true, '条件组')
+      + '<button type="button" class="mini-btn danger" data-act="custom-filter-del" data-idx="' + index + '" aria-label="删除条件组 ' + number + '">' + ic('x', 12) + '</button></div></div>'
+      + renderItems(c.conditions, index) + (!c.conditions.length ? '<span class="custom-filter-no-value">空条件组暂不参与筛选</span>' : '') + '</div>';
     const noValue = c.op === "empty" || c.op === "notEmpty";
     const date = isDateField(c.field), range = date && c.op === "between";
     const legacy = date && !DATE_OPERATORS.some((o) => o.op === c.op);
     const input = (part, label) => {
       const picker = date && !legacy;
       const attrs = ' data-idx="' + index + '" data-part="' + part + '"';
-      const field = '<input type="text" class="cfg-input custom-filter-value" data-act="custom-filter-value"' + attrs + ' aria-label="条件 ' + (index + 1) + ' ' + label + '" value="' + esc(c[part] || '') + '"'
+      const field = '<input type="text" class="cfg-input custom-filter-value" data-act="custom-filter-value"' + attrs + ' aria-label="条件 ' + number + ' ' + label + '" value="' + esc(c[part] || '') + '"'
         + (picker ? ' data-date-input="true" inputmode="numeric" maxlength="10" placeholder="20260101" title="输入 YYYYMMDD 或 YYYY-MM-DD，也可点日历选日期"' : '')
-        + (legacy ? ' readonly title="原文本条件已保留，请切换运算符使用日期筛选"' : '') + (!date ? ' placeholder="' + (c.op === 'in' ? '多项用逗号分隔' : '输入匹配值') + '"' : '') + '>';
-      return picker ? '<div class="custom-date">' + field + '<button type="button" data-date-action="open"' + attrs + ' aria-label="打开条件 ' + (index + 1) + ' ' + label + '日历" aria-haspopup="dialog" aria-expanded="false">' + ic("calendar", 14) + '</button></div>' : field;
+        + (legacy ? ' readonly title="原文本条件已保留，请切换运算符使用日期筛选"' : '') + (!date ? ' placeholder="' + (c.op === 'containsAny' ? '如：面巾；餐巾（任一项匹配）' : c.op === 'in' ? '多项用逗号分隔' : '输入匹配值') + '"' : '') + '>';
+      return picker ? '<div class="custom-date">' + field + '<button type="button" data-date-action="open"' + attrs + ' aria-label="打开条件 ' + number + ' ' + label + '日历" aria-haspopup="dialog" aria-expanded="false">' + ic("calendar", 14) + '</button></div>' : field;
     };
     const invalid = date && !legacy && !noValue && [c.val, ...(range ? [c.valTo] : [])].some((v) => v && !isoDate(v));
     const error = invalid ? '请输入有效日期，如 20260101' : range && c.val && c.valTo && isoDate(c.val) > isoDate(c.valTo) ? '结束日期不能早于开始日期' : '';
-    h += '<div class="custom-filter-row' + (range ? ' has-date-range' : '') + '">'
-      + '<span class="tag blue" title="条件 ' + (index + 1) + '">' + (index + 1) + '</span>'
-      + '<select class="cfg-select custom-filter-field" data-act="custom-filter-field" data-idx="' + index + '" aria-label="条件 ' + (index + 1) + ' 字段">' + buildFieldOptionsHtml(c.field) + '</select>'
-      + '<select class="cfg-select custom-filter-op" data-act="custom-filter-op" data-idx="' + index + '" aria-label="条件 ' + (index + 1) + ' 运算符">'
+    return '<div class="custom-filter-row' + (range ? ' has-date-range' : '') + '">'
+      + '<span class="tag blue" title="条件 ' + number + '">' + number + '</span>'
+      + '<select class="cfg-select custom-filter-field" data-act="custom-filter-field" data-idx="' + index + '" aria-label="条件 ' + number + ' 字段">' + buildFieldOptionsHtml(c.field) + '</select>'
+      + '<select class="cfg-select custom-filter-op" data-act="custom-filter-op" data-idx="' + index + '" aria-label="条件 ' + number + ' 运算符">'
       + filterConditionOperators(c.field, c.op).map((o) => '<option value="' + o.op + '"' + (c.op === o.op ? ' selected' : '') + (o.legacy ? ' disabled' : '') + '>' + esc(o.label) + '</option>').join('') + '</select>'
       + (noValue ? '<span class="custom-filter-no-value">无需填写匹配值</span>' : range ? '<div class="custom-filter-range">' + input('val', '开始日期') + '<span>至</span>' + input('valTo', '结束日期') + '</div>' : input('val', date ? '日期' : '匹配值'))
-      + '<button class="mini-btn danger" data-act="custom-filter-del" data-idx="' + index + '" aria-label="删除条件 ' + (index + 1) + '">' + ic("x", 12) + '</button>'
+      + '<button class="mini-btn danger" data-act="custom-filter-del" data-idx="' + index + '" aria-label="删除条件 ' + number + '">' + ic("x", 12) + '</button>'
       + (error ? '<span class="custom-filter-error" role="alert">' + error + '</span>' : '') + '</div>';
-  });
-  h += '</div><div class="custom-filter-hint">' + (conditions.length ? '完整日期自动生效，支持手输 20260101；区间包含起止当天，“为空”包含空值和“无”。' : '按任意字段添加条件，可选择全部满足或任一满足。')
-    + '</div></div>';
-  return h;
+  }).join('');
+  return '<div class="fzone custom-filter-zone" id="customFilterZone">'
+    + '<div class="custom-filter-head"><b>' + ic('filter', 13) + ' 自定义条件配置</b><span class="tag blue">' + activeCustomConditions().length + ' 条生效</span><div class="custom-filter-actions">'
+    + (conditions.length ? '<button class="mini-btn" data-act="custom-filter-clear">清空</button>' : '') + add('', false, '添加条件') + add('', true, '添加条件组') + '</div></div>'
+    + '<div class="custom-filter-controls"><span>保留满足</span>' + relation(f.customLogic, '') + '<span>的物料</span></div>'
+    + '<div class="custom-filter-list">' + renderItems(conditions) + '</div>'
+    + '<div class="custom-filter-hint">条件组可交替嵌套 AND / OR；“包含任一项”用 ; 或 ；分隔。日期支持手输 20260101，空条件暂不生效。</div></div>';
 }
 
 function renderFilters() {
@@ -7822,30 +7899,69 @@ function renderVconf() {
   el.innerHTML = h;
 }
 
-/* ---------- 统一刷新入口（固定顺序，渲染函数互不调用） ---------- */
+/* 保留当前视口高度，避免切换到短看板、重建筛选区时浏览器收缩文档并拉走滚动位置。 */
+function preserveWorkspaceViewport(render) {
+  const page = typeof document !== 'undefined' && document.querySelector('main.page');
+  if (!page || typeof window === 'undefined' || state.detailPage) return render();
+  const y = window.scrollY, x = window.scrollX || 0;
+  if (y > 0) {
+    const top = page.getBoundingClientRect().top + y;
+    page.style.minHeight = Math.max(parseFloat(page.style.minHeight) || 0, y + window.innerHeight - top) + 'px';
+  }
+  try { return render(); }
+  finally { if (y > 0) window.scrollTo({ top: y, left: x, behavior: 'instant' }); }
+}
+let workspaceRevision = 0;
+const workspacePanelCache = new Map();
+function workspacePanelKey(tab) {
+  const local = {focus:state.focusFilter,vconf:state.vconfFilter,process:state.processCheckFilter,mps:state.mpsFilter,analyze:[state.analyzeField,state.analyzeFilter]};
+  return workspaceRevision + ':' + JSON.stringify(local[tab] || null);
+}
+function renderWorkspacePanel(force = false) {
+  const tab = state.tab;
+  if (!force && workspacePanelCache.get(tab) === workspacePanelKey(tab)) return;
+  if (tab === 'results') { renderResults(); renderPager(); renderViewSeg(); renderResultLine(); }
+  else if (tab === 'focus') renderFocus();
+  else if (tab === 'vconf') renderVconf();
+  else if (tab === 'analyze') renderAnalyze();
+  else if (tab === 'rules') renderRules();
+  else if (tab === 'process') renderProcessChecks();
+  else if (tab === 'mps') renderMps();
+  workspacePanelCache.set(tab, workspacePanelKey(tab));
+}
+function switchWorkspaceTab(tab) {
+  if (!['results','focus','vconf','analyze','rules','process','mps'].includes(tab) || tab === state.tab) return;
+  preserveWorkspaceViewport(() => {
+    state.tab = tab;
+    renderTabs();
+    renderWorkspacePanel();
+    if (typeof syncTableXnav === 'function') {
+      const tables = {results:'mainTableWrap',process:'processCheckTableWrap',mps:'mpsTableWrap',focus:'focusTableWrap',vconf:'vconfTableWrap'};
+      if (tables[tab]) syncTableXnav(tables[tab]);
+    }
+    if (typeof searchDock !== 'undefined' && searchDock) searchDock.update();
+  });
+  saveStateDebounced();
+}
+/* 筛选变化才重算全局数据；隐藏看板在下次打开时再更新。 */
 function refreshAll() {
-  computeDerived();
-  renderTabs();
-  if (state.tab === "focus") renderFocus();
-  if (state.tab === "vconf") renderVconf();
-  renderSearchAssist();
-  renderFilters();
-  renderResultLine();
-  renderBasket();
-  renderResults();
-  renderPager();
-  renderViewSeg();
-  renderDetail();
-  renderDetailPage();
-  renderDpConfigModal();
-  renderFieldDrawer();
-  renderCompare();
-  if (state.tab === "analyze") renderAnalyze();
-  if (state.tab === "rules") renderRules();
-  if (state.tab === "process") renderProcessChecks();
-  if (state.tab === "mps") renderMps();
-  if (typeof syncBodyScrollLock === "function") syncBodyScrollLock();
-  if (typeof searchDock !== "undefined" && searchDock) searchDock.update();
+  preserveWorkspaceViewport(() => {
+    computeDerived();
+    workspaceRevision++;
+    renderTabs();
+    renderSearchAssist();
+    renderFilters();
+    renderBasket();
+    renderQueryWorkspace();
+    renderWorkspacePanel(true);
+    renderDetail();
+    renderDetailPage();
+    renderDpConfigModal();
+    renderFieldDrawer();
+    renderCompare();
+    if (typeof syncBodyScrollLock === 'function') syncBodyScrollLock();
+    if (typeof searchDock !== 'undefined' && searchDock) searchDock.update();
+  });
 }
 
 </script>
@@ -7996,7 +8112,7 @@ function renderCustomDatePicker(focusPart) {
   const picker = customDatePicker;
   if (!picker) return;
   const box = document.getElementById("customDatePicker");
-  const c = state.filters.customConditions[picker.index];
+  const c = customFilterNode(picker.index);
   if (!box || !c) { closeCustomDatePicker(); return; }
   const chosen = isoDate(c[picker.part]);
   const first = new Date(picker.year, picker.month - 1, 1).getDay();
@@ -8019,10 +8135,10 @@ function renderCustomDatePicker(focusPart) {
 }
 function openCustomDatePicker(button) {
   clearTimeout(customFilterTimer);
-  const index = Number(button.dataset.idx), part = button.dataset.part === "valTo" ? "valTo" : "val";
+  const index = button.dataset.idx, part = button.dataset.part === "valTo" ? "valTo" : "val";
   if (customDatePicker?.index === index && customDatePicker.part === part) { closeCustomDatePicker(true); return; }
   closeCustomDatePicker();
-  const c = state.filters.customConditions[index];
+  const c = customFilterNode(index);
   if (!c) return;
   for (const key of ["val", "valTo"]) if (isoDate(c[key])) c[key] = isoDate(c[key]);
   refreshCustomFilters();
@@ -8031,7 +8147,7 @@ function openCustomDatePicker(button) {
   const date = isoDate(c[part]) || isoDate(c.val) || new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0') + '-01';
   customDatePicker = { index, part, year: Number(date.slice(0, 4)), month: Number(date.slice(5, 7)) };
   const box = document.createElement('div'); box.id = 'customDatePicker'; box.className = 'date-picker-popover';
-  box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', '选择条件 ' + (index + 1) + ' ' + (part === 'valTo' ? '结束日期' : c.op === 'between' ? '开始日期' : '日期'));
+  box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', '选择条件 ' + customConditionPathLabel(index) + ' ' + (part === 'valTo' ? '结束日期' : c.op === 'between' ? '开始日期' : '日期'));
   document.body.appendChild(box);
   button.setAttribute('aria-expanded', 'true');
   renderCustomDatePicker();
@@ -8055,7 +8171,7 @@ function bindCustomDatePickers() {
     if (action === 'close') { closeCustomDatePicker(true); return; }
     if (action === 'choose') {
       const { index, part } = customDatePicker;
-      state.filters.customConditions[index][part] = control.dataset.dateValue;
+      customFilterNode(index)[part] = control.dataset.dateValue;
       closeCustomDatePicker(); refreshCustomFilters();
       document.querySelector('[data-act="custom-filter-value"][data-idx="' + index + '"][data-part="' + part + '"]')?.focus({ preventScroll: true });
       return;
@@ -8487,10 +8603,13 @@ function applyVisibleListOrder(newVisList) {
   state.visible = [...finalVis];
   saveStateDebounced();
   // 字段勾选与排序只更新展示列；不重算筛选、不重建右侧候选池。
-  syncFieldDrawerInPlace();
-  renderResults();
-  renderCompare();
-  renderAnalyze();
+  preserveWorkspaceViewport(() => {
+    syncFieldDrawerInPlace();
+    workspacePanelCache.delete("results");
+    workspacePanelCache.delete("analyze");
+    if (state.tab === "results" || state.tab === "analyze") renderWorkspacePanel(true);
+    if (state.compareOpen) renderCompare();
+  });
 }
 function bindFieldDrag() {
   const body = document.getElementById("fieldBody");
@@ -9227,7 +9346,7 @@ function queueCustomFilterValue(input, isComposing) {
   clearTimeout(customFilterTimer);
   // 中文输入法选词期间保持输入框原样，确认文字后再查询。
   if (isComposing) return;
-  const condition = state.filters.customConditions[Number(input.dataset.idx)];
+  const condition = customFilterNode(input.dataset.idx);
   if (!condition) return;
   condition[input.dataset.part === "valTo" ? "valTo" : "val"] = input.value;
   customFilterTimer = setTimeout(() => {
@@ -9407,7 +9526,7 @@ function onClick(e) {
     }
     case "view-table": state.view = "table"; saveStateDebounced(); refreshAll(); break;
     case "view-card": state.view = "card"; saveStateDebounced(); refreshAll(); break;
-    case "open-fields": openDrawer("fields"); refreshAll(); break;
+    case "open-fields": openDrawer("fields"); renderFieldDrawer(); syncBodyScrollLock(); break;
     case "close-drawer": closeAllDrawers(); break;
     case "view-detail":
       if (el.tagName === 'A' && (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)) break;
@@ -9458,7 +9577,7 @@ function onClick(e) {
       }
       break;
     }
-    case "tab": state.tab = (["results", "focus", "analyze", "rules", "vconf", "process", "mps"].includes(v) ? v : "results"); saveStateDebounced(); refreshAll(); break;
+    case "tab": switchWorkspaceTab(v); break;
     case "open-source-modal": openSourceModal(); break;
     case "vconf-inspect": {
       const vc = (el.dataset.vcode || v || "").trim();
@@ -9583,24 +9702,32 @@ function onClick(e) {
       renderFilters();
       document.getElementById("customFilterZone").scrollIntoView({ block: "nearest", behavior: "smooth" });
       break;
-    case "custom-filter-add": {
-      state.filters.customConditions.push({ field: schemaByKey.has("品类二级") ? "品类二级" : "cat", op: "eq", val: "" });
+    case "custom-filter-add":
+    case "custom-filter-add-group": {
+      const parent = el.dataset.parent || '', list = customFilterChildren(parent);
+      const group = act === 'custom-filter-add-group';
+      if (!list) break;
+      if (customFilterEntries().length + (group ? 2 : 1) > CUSTOM_MAX_NODES || group && parent.split('.').filter(Boolean).length >= CUSTOM_MAX_DEPTH) {
+        toast('条件最多支持 ' + CUSTOM_MAX_NODES + ' 项、' + CUSTOM_MAX_DEPTH + ' 层条件组', true); break;
+      }
+      const condition = { field: schemaByKey.has('品类二级') ? '品类二级' : 'cat', op: 'eq', val: '' };
+      const parentLogic = parent ? customFilterNode(parent).logic : state.filters.customLogic;
+      list.push(group ? { type: 'group', logic: parentLogic === 'OR' ? 'AND' : 'OR', conditions: [condition] } : condition);
+      const path = (parent ? parent + '.' : '') + (list.length - 1) + (group ? '.0' : '');
       refreshCustomFilters();
-      const index = state.filters.customConditions.length - 1;
-      const field = document.querySelector('[data-act="custom-filter-field"][data-idx="' + index + '"]');
+      const field = document.querySelector('[data-act="custom-filter-field"][data-idx="' + path + '"]');
       if (field) {
         field.focus({ preventScroll: true });
-        const list = field.closest(".custom-filter-list");
-        const row = field.closest(".custom-filter-row");
-        if (list && row) list.scrollTop += Math.max(0, row.getBoundingClientRect().bottom - list.getBoundingClientRect().bottom);
+        const viewport = field.closest('.custom-filter-list');
+        if (viewport) viewport.scrollTop += Math.max(0, field.getBoundingClientRect().bottom - viewport.getBoundingClientRect().bottom);
       }
       break;
     }
     case "custom-filter-del": {
-      const index = Number(el.dataset.idx);
-      if (Number.isInteger(index) && index >= 0 && index < state.filters.customConditions.length) {
-        state.filters.customConditions.splice(index, 1);
-        refreshCustomFilters();
+      const parts = String(el.dataset.idx || '').split('.'), index = Number(parts.pop());
+      const list = customFilterChildren(parts.join('.'));
+      if (list && Number.isInteger(index) && index >= 0 && index < list.length) {
+        list.splice(index, 1); refreshCustomFilters();
       }
       break;
     }
@@ -10307,13 +10434,18 @@ function onChange(e) {
   }
   if (el.dataset && el.dataset.act) {
     const act = el.dataset.act;
-    if (act === "custom-filter-logic") {
-      state.filters.customLogic = el.value === "OR" ? "OR" : "AND";
+    if (act === "custom-filter-logic" || act === "custom-filter-group-logic") {
+      const logic = el.value === "OR" ? "OR" : "AND";
+      if (act === "custom-filter-group-logic") {
+        const group = customFilterNode(el.dataset.idx);
+        if (!group || group.type !== 'group') return;
+        group.logic = logic;
+      } else state.filters.customLogic = logic;
       refreshCustomFilters();
       return;
     }
     if (["custom-filter-field", "custom-filter-op", "custom-filter-value"].includes(act)) {
-      const condition = state.filters.customConditions[Number(el.dataset.idx)]; if (!condition) return;
+      const condition = customFilterNode(el.dataset.idx); if (!condition) return;
       const key = act === "custom-filter-field" ? "field" : act === "custom-filter-op" ? "op" : el.dataset.part === "valTo" ? "valTo" : "val";
       if (condition[key] !== el.value) {
         const wasDate = isDateField(condition.field);
@@ -10505,7 +10637,7 @@ function bindInputs() {
     if (e.key === "Enter" && !e.isComposing && e.target.dataset.act === "custom-filter-value") {
       e.preventDefault();
       if (e.target.dataset.dateInput) {
-        const c = state.filters.customConditions[Number(e.target.dataset.idx)];
+        const c = customFilterNode(e.target.dataset.idx);
         const part = e.target.dataset.part === "valTo" ? "valTo" : "val";
         if (c && isoDate(c[part])) c[part] = isoDate(c[part]);
       }

@@ -25,7 +25,7 @@ Windows 激活环境使用 `.venv\Scripts\activate`。也可双击 `启动工作
 
 ## 主要功能
 
-- **搜索与筛选**：关键词、物料编码、V 码、批量查码自动识别；搜索范围下拉；智能与精准匹配；日期、区间和自定义组合条件。
+- **搜索与筛选**：关键词、物料编码、V 码、批量查码自动识别；日期、区间和可交替嵌套的 AND/OR 条件组。“包含任一项”支持中英文分号分隔，原“包含”保留完整文字匹配。
 - **持续查询**：搜索框随滚动吸顶；清空保留范围和筛选；查询结果使用内嵌滚动表格、冻结列、字段定位及分页。
 - **个人视图**：管理可见字段和顺序；自定义字段视图、一键切换、命名保存查询。
 - **速览与详情**：半屏速览可配置区块、字段及顺序；完整详情支持模板、条件路由和字段拖拽。编码链接可直接进入完整详情。
@@ -71,6 +71,8 @@ python3 -m unittest discover -s tests -p 'test_*.py'
 # 前端测试使用 Node.js 20+
 node tests/test_advq_query.cjs
 node tests/test_advq_conditions.cjs
+node tests/test_advq_nested_filters.cjs
+node tests/test_advq_workspace.cjs
 node tests/test_advq_process.cjs
 node tests/test_advq_governance.cjs
 node tests/test_advq_mps.cjs

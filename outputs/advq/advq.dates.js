@@ -13,7 +13,7 @@ function renderCustomDatePicker(focusPart) {
   const picker = customDatePicker;
   if (!picker) return;
   const box = document.getElementById("customDatePicker");
-  const c = state.filters.customConditions[picker.index];
+  const c = customFilterNode(picker.index);
   if (!box || !c) { closeCustomDatePicker(); return; }
   const chosen = isoDate(c[picker.part]);
   const first = new Date(picker.year, picker.month - 1, 1).getDay();
@@ -36,10 +36,10 @@ function renderCustomDatePicker(focusPart) {
 }
 function openCustomDatePicker(button) {
   clearTimeout(customFilterTimer);
-  const index = Number(button.dataset.idx), part = button.dataset.part === "valTo" ? "valTo" : "val";
+  const index = button.dataset.idx, part = button.dataset.part === "valTo" ? "valTo" : "val";
   if (customDatePicker?.index === index && customDatePicker.part === part) { closeCustomDatePicker(true); return; }
   closeCustomDatePicker();
-  const c = state.filters.customConditions[index];
+  const c = customFilterNode(index);
   if (!c) return;
   for (const key of ["val", "valTo"]) if (isoDate(c[key])) c[key] = isoDate(c[key]);
   refreshCustomFilters();
@@ -48,7 +48,7 @@ function openCustomDatePicker(button) {
   const date = isoDate(c[part]) || isoDate(c.val) || new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0') + '-01';
   customDatePicker = { index, part, year: Number(date.slice(0, 4)), month: Number(date.slice(5, 7)) };
   const box = document.createElement('div'); box.id = 'customDatePicker'; box.className = 'date-picker-popover';
-  box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', '选择条件 ' + (index + 1) + ' ' + (part === 'valTo' ? '结束日期' : c.op === 'between' ? '开始日期' : '日期'));
+  box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', '选择条件 ' + customConditionPathLabel(index) + ' ' + (part === 'valTo' ? '结束日期' : c.op === 'between' ? '开始日期' : '日期'));
   document.body.appendChild(box);
   button.setAttribute('aria-expanded', 'true');
   renderCustomDatePicker();
@@ -72,7 +72,7 @@ function bindCustomDatePickers() {
     if (action === 'close') { closeCustomDatePicker(true); return; }
     if (action === 'choose') {
       const { index, part } = customDatePicker;
-      state.filters.customConditions[index][part] = control.dataset.dateValue;
+      customFilterNode(index)[part] = control.dataset.dateValue;
       closeCustomDatePicker(); refreshCustomFilters();
       document.querySelector('[data-act="custom-filter-value"][data-idx="' + index + '"][data-part="' + part + '"]')?.focus({ preventScroll: true });
       return;

@@ -33,12 +33,12 @@ assert.equal(processCheckRows()[0].material,nonRoute.material);exportProcessChec
 assert.equal(derived.stats.withIssues>0,true,'normal process checks must remain part of MDM governance totals');
 let processRenders=0,routeRenders=0,refreshes=0;
 renderProcessChecks=()=>{processRenders++;};renderMps=()=>{routeRenders++;};refreshAll=()=>{refreshes++;};
-document={querySelectorAll:()=>[]};
+document={querySelectorAll:()=>[],querySelector:()=>null};renderTabs=()=>{};syncTableXnav=()=>{};
 function click(action,value){const button={dataset:{act:action,v:value},tagName:'BUTTON',closest:()=>null};onClick({target:{closest:(selector)=>selector==='[data-act]'?button:null}});}
 state.mpsFilter.page=5;click('process-check-page','3');assert.equal(state.processCheckFilter.page,3);assert.equal(state.mpsFilter.page,5);assert.equal(processRenders,1);assert.equal(routeRenders,0);
 click('process-check-scope','all');assert.equal(state.processCheckFilter.page,1);assert.equal(state.processCheckFilter.onlyIssue,false);assert.equal(state.mpsFilter.page,5);
 click('mps-page','2');assert.equal(state.mpsFilter.page,2);assert.equal(state.processCheckFilter.page,1);assert.equal(routeRenders,1);
-click('tab','process');assert.equal(state.tab,'process');assert.equal(refreshes,1);
+click('tab','process');assert.equal(state.tab,'process');assert.equal(refreshes,0,'tab switches do not refresh the whole page');
 click('mps-clear-filter');assert.equal(state.processCheckFilter.onlyIssue,false);assert.equal(Object.hasOwn(state.mpsFilter,'view'),false);
 const current=captureUserSettings();assert.ok(current.processCheckFilter);assert.equal(Object.hasOwn(current.mpsFilter,'attributeOnlyIssue'),false);
 console.log('PASS: process governance is separate from MPS; legacy settings migrate without losing rules; filters, paging and exports are independent and share global search.');

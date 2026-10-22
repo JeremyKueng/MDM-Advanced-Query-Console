@@ -312,10 +312,13 @@ function applyVisibleListOrder(newVisList) {
   state.visible = [...finalVis];
   saveStateDebounced();
   // 字段勾选与排序只更新展示列；不重算筛选、不重建右侧候选池。
-  syncFieldDrawerInPlace();
-  renderResults();
-  renderCompare();
-  renderAnalyze();
+  preserveWorkspaceViewport(() => {
+    syncFieldDrawerInPlace();
+    workspacePanelCache.delete("results");
+    workspacePanelCache.delete("analyze");
+    if (state.tab === "results" || state.tab === "analyze") renderWorkspacePanel(true);
+    if (state.compareOpen) renderCompare();
+  });
 }
 function bindFieldDrag() {
   const body = document.getElementById("fieldBody");
@@ -1052,7 +1055,7 @@ function queueCustomFilterValue(input, isComposing) {
   clearTimeout(customFilterTimer);
   // 中文输入法选词期间保持输入框原样，确认文字后再查询。
   if (isComposing) return;
-  const condition = state.filters.customConditions[Number(input.dataset.idx)];
+  const condition = customFilterNode(input.dataset.idx);
   if (!condition) return;
   condition[input.dataset.part === "valTo" ? "valTo" : "val"] = input.value;
   customFilterTimer = setTimeout(() => {
@@ -1232,7 +1235,7 @@ function onClick(e) {
     }
     case "view-table": state.view = "table"; saveStateDebounced(); refreshAll(); break;
     case "view-card": state.view = "card"; saveStateDebounced(); refreshAll(); break;
-    case "open-fields": openDrawer("fields"); refreshAll(); break;
+    case "open-fields": openDrawer("fields"); renderFieldDrawer(); syncBodyScrollLock(); break;
     case "close-drawer": closeAllDrawers(); break;
     case "view-detail":
       if (el.tagName === 'A' && (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)) break;
@@ -1283,7 +1286,7 @@ function onClick(e) {
       }
       break;
     }
-    case "tab": state.tab = (["results", "focus", "analyze", "rules", "vconf", "process", "mps"].includes(v) ? v : "results"); saveStateDebounced(); refreshAll(); break;
+    case "tab": switchWorkspaceTab(v); break;
     case "open-source-modal": openSourceModal(); break;
     case "vconf-inspect": {
       const vc = (el.dataset.vcode || v || "").trim();
@@ -1408,24 +1411,32 @@ function onClick(e) {
       renderFilters();
       document.getElementById("customFilterZone").scrollIntoView({ block: "nearest", behavior: "smooth" });
       break;
-    case "custom-filter-add": {
-      state.filters.customConditions.push({ field: schemaByKey.has("品类二级") ? "品类二级" : "cat", op: "eq", val: "" });
+    case "custom-filter-add":
+    case "custom-filter-add-group": {
+      const parent = el.dataset.parent || '', list = customFilterChildren(parent);
+      const group = act === 'custom-filter-add-group';
+      if (!list) break;
+      if (customFilterEntries().length + (group ? 2 : 1) > CUSTOM_MAX_NODES || group && parent.split('.').filter(Boolean).length >= CUSTOM_MAX_DEPTH) {
+        toast('条件最多支持 ' + CUSTOM_MAX_NODES + ' 项、' + CUSTOM_MAX_DEPTH + ' 层条件组', true); break;
+      }
+      const condition = { field: schemaByKey.has('品类二级') ? '品类二级' : 'cat', op: 'eq', val: '' };
+      const parentLogic = parent ? customFilterNode(parent).logic : state.filters.customLogic;
+      list.push(group ? { type: 'group', logic: parentLogic === 'OR' ? 'AND' : 'OR', conditions: [condition] } : condition);
+      const path = (parent ? parent + '.' : '') + (list.length - 1) + (group ? '.0' : '');
       refreshCustomFilters();
-      const index = state.filters.customConditions.length - 1;
-      const field = document.querySelector('[data-act="custom-filter-field"][data-idx="' + index + '"]');
+      const field = document.querySelector('[data-act="custom-filter-field"][data-idx="' + path + '"]');
       if (field) {
         field.focus({ preventScroll: true });
-        const list = field.closest(".custom-filter-list");
-        const row = field.closest(".custom-filter-row");
-        if (list && row) list.scrollTop += Math.max(0, row.getBoundingClientRect().bottom - list.getBoundingClientRect().bottom);
+        const viewport = field.closest('.custom-filter-list');
+        if (viewport) viewport.scrollTop += Math.max(0, field.getBoundingClientRect().bottom - viewport.getBoundingClientRect().bottom);
       }
       break;
     }
     case "custom-filter-del": {
-      const index = Number(el.dataset.idx);
-      if (Number.isInteger(index) && index >= 0 && index < state.filters.customConditions.length) {
-        state.filters.customConditions.splice(index, 1);
-        refreshCustomFilters();
+      const parts = String(el.dataset.idx || '').split('.'), index = Number(parts.pop());
+      const list = customFilterChildren(parts.join('.'));
+      if (list && Number.isInteger(index) && index >= 0 && index < list.length) {
+        list.splice(index, 1); refreshCustomFilters();
       }
       break;
     }
@@ -2132,13 +2143,18 @@ function onChange(e) {
   }
   if (el.dataset && el.dataset.act) {
     const act = el.dataset.act;
-    if (act === "custom-filter-logic") {
-      state.filters.customLogic = el.value === "OR" ? "OR" : "AND";
+    if (act === "custom-filter-logic" || act === "custom-filter-group-logic") {
+      const logic = el.value === "OR" ? "OR" : "AND";
+      if (act === "custom-filter-group-logic") {
+        const group = customFilterNode(el.dataset.idx);
+        if (!group || group.type !== 'group') return;
+        group.logic = logic;
+      } else state.filters.customLogic = logic;
       refreshCustomFilters();
       return;
     }
     if (["custom-filter-field", "custom-filter-op", "custom-filter-value"].includes(act)) {
-      const condition = state.filters.customConditions[Number(el.dataset.idx)]; if (!condition) return;
+      const condition = customFilterNode(el.dataset.idx); if (!condition) return;
       const key = act === "custom-filter-field" ? "field" : act === "custom-filter-op" ? "op" : el.dataset.part === "valTo" ? "valTo" : "val";
       if (condition[key] !== el.value) {
         const wasDate = isDateField(condition.field);
@@ -2330,7 +2346,7 @@ function bindInputs() {
     if (e.key === "Enter" && !e.isComposing && e.target.dataset.act === "custom-filter-value") {
       e.preventDefault();
       if (e.target.dataset.dateInput) {
-        const c = state.filters.customConditions[Number(e.target.dataset.idx)];
+        const c = customFilterNode(e.target.dataset.idx);
         const part = e.target.dataset.part === "valTo" ? "valTo" : "val";
         if (c && isoDate(c[part])) c[part] = isoDate(c[part]);
       }

@@ -2389,28 +2389,67 @@ function renderVconf() {
   el.innerHTML = h;
 }
 
-/* ---------- 统一刷新入口（固定顺序，渲染函数互不调用） ---------- */
+/* 保留当前视口高度，避免切换到短看板、重建筛选区时浏览器收缩文档并拉走滚动位置。 */
+function preserveWorkspaceViewport(render) {
+  const page = typeof document !== 'undefined' && document.querySelector('main.page');
+  if (!page || typeof window === 'undefined' || state.detailPage) return render();
+  const y = window.scrollY, x = window.scrollX || 0;
+  if (y > 0) {
+    const top = page.getBoundingClientRect().top + y;
+    page.style.minHeight = Math.max(parseFloat(page.style.minHeight) || 0, y + window.innerHeight - top) + 'px';
+  }
+  try { return render(); }
+  finally { if (y > 0) window.scrollTo({ top: y, left: x, behavior: 'instant' }); }
+}
+let workspaceRevision = 0;
+const workspacePanelCache = new Map();
+function workspacePanelKey(tab) {
+  const local = {focus:state.focusFilter,vconf:state.vconfFilter,process:state.processCheckFilter,mps:state.mpsFilter,analyze:[state.analyzeField,state.analyzeFilter]};
+  return workspaceRevision + ':' + JSON.stringify(local[tab] || null);
+}
+function renderWorkspacePanel(force = false) {
+  const tab = state.tab;
+  if (!force && workspacePanelCache.get(tab) === workspacePanelKey(tab)) return;
+  if (tab === 'results') { renderResults(); renderPager(); renderViewSeg(); renderResultLine(); }
+  else if (tab === 'focus') renderFocus();
+  else if (tab === 'vconf') renderVconf();
+  else if (tab === 'analyze') renderAnalyze();
+  else if (tab === 'rules') renderRules();
+  else if (tab === 'process') renderProcessChecks();
+  else if (tab === 'mps') renderMps();
+  workspacePanelCache.set(tab, workspacePanelKey(tab));
+}
+function switchWorkspaceTab(tab) {
+  if (!['results','focus','vconf','analyze','rules','process','mps'].includes(tab) || tab === state.tab) return;
+  preserveWorkspaceViewport(() => {
+    state.tab = tab;
+    renderTabs();
+    renderWorkspacePanel();
+    if (typeof syncTableXnav === 'function') {
+      const tables = {results:'mainTableWrap',process:'processCheckTableWrap',mps:'mpsTableWrap',focus:'focusTableWrap',vconf:'vconfTableWrap'};
+      if (tables[tab]) syncTableXnav(tables[tab]);
+    }
+    if (typeof searchDock !== 'undefined' && searchDock) searchDock.update();
+  });
+  saveStateDebounced();
+}
+/* 筛选变化才重算全局数据；隐藏看板在下次打开时再更新。 */
 function refreshAll() {
-  computeDerived();
-  renderTabs();
-  if (state.tab === "focus") renderFocus();
-  if (state.tab === "vconf") renderVconf();
-  renderSearchAssist();
-  renderFilters();
-  renderResultLine();
-  renderBasket();
-  renderResults();
-  renderPager();
-  renderViewSeg();
-  renderDetail();
-  renderDetailPage();
-  renderDpConfigModal();
-  renderFieldDrawer();
-  renderCompare();
-  if (state.tab === "analyze") renderAnalyze();
-  if (state.tab === "rules") renderRules();
-  if (state.tab === "process") renderProcessChecks();
-  if (state.tab === "mps") renderMps();
-  if (typeof syncBodyScrollLock === "function") syncBodyScrollLock();
-  if (typeof searchDock !== "undefined" && searchDock) searchDock.update();
+  preserveWorkspaceViewport(() => {
+    computeDerived();
+    workspaceRevision++;
+    renderTabs();
+    renderSearchAssist();
+    renderFilters();
+    renderBasket();
+    renderQueryWorkspace();
+    renderWorkspacePanel(true);
+    renderDetail();
+    renderDetailPage();
+    renderDpConfigModal();
+    renderFieldDrawer();
+    renderCompare();
+    if (typeof syncBodyScrollLock === 'function') syncBodyScrollLock();
+    if (typeof searchDock !== 'undefined' && searchDock) searchDock.update();
+  });
 }

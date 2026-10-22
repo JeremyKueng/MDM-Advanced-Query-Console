@@ -10,6 +10,23 @@ MAX_BYTES = 2 * 1024 * 1024
 FORMAT = "mdm-workbench-config"
 
 
+def validate_conditions(items, depth=0, budget=None):
+    if budget is None:
+        budget = [0]
+    if not isinstance(items, list) or depth > 8:
+        raise ValueError("条件组格式不正确或嵌套过深")
+    for node in items:
+        budget[0] += 1
+        if budget[0] > 200 or not isinstance(node, dict):
+            raise ValueError("条件配置格式不正确或数量过多")
+        if node.get("type") == "group":
+            if node.get("logic") not in ("AND", "OR"):
+                raise ValueError("条件组必须选择 AND 或 OR")
+            validate_conditions(node.get("conditions"), depth + 1, budget)
+        elif node.get("type") not in (None, "condition") or not isinstance(node.get("field"), str) or not isinstance(node.get("op"), str):
+            raise ValueError("条件配置格式不正确")
+
+
 def config_directory():
     override = os.environ.get("MDM_WORKBENCH_CONFIG_DIR")
     if override:
@@ -24,7 +41,7 @@ def validate_document(value):
     if value.get("schemaVersion") != 1:
         raise ValueError("配置文件版本不支持，请保留原文件并使用匹配版本的工作台")
     settings = value.get("settings")
-    if not isinstance(settings, dict) or type(settings.get("v")) is not int or not 1 <= settings["v"] <= 6:
+    if not isinstance(settings, dict) or type(settings.get("v")) is not int or not 1 <= settings["v"] <= 7:
         raise ValueError("个人配置内容或版本不支持")
 
     def string_list(obj, key):
@@ -33,6 +50,8 @@ def validate_document(value):
 
     for key in ("order", "visible", "basket", "expandedMore", "viewShortcuts"):
         string_list(settings, key)
+    if isinstance(settings.get("filters"), dict) and "customConditions" in settings["filters"]:
+        validate_conditions(settings["filters"]["customConditions"])
     if "filters" in settings:
         if not isinstance(settings["filters"], dict):
             raise ValueError("配置中的筛选条件必须为对象")
@@ -83,8 +102,9 @@ def validate_document(value):
             if type(filters.get(key)) is not bool:
                 raise ValueError("我的查询质量筛选无效")
         conditions = filters.get("customConditions")
-        if filters.get("customLogic") not in ("AND", "OR") or not isinstance(conditions, list) or any(not isinstance(c, dict) or not isinstance(c.get("field"), str) or not isinstance(c.get("op"), str) for c in conditions):
+        if filters.get("customLogic") not in ("AND", "OR"):
             raise ValueError("我的查询自定义条件无效")
+        validate_conditions(conditions)
     for template in settings.get("dpTemplates", []):
         if not isinstance(template.get("id"), str) or not isinstance(template.get("name"), str) or not isinstance(template.get("blocks"), list):
             raise ValueError("详情模板格式不正确")

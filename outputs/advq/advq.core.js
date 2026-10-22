@@ -214,9 +214,12 @@ const DATE_OPERATORS = [
   { op: "between", label: "日期区间（含起止）" },
   { op: "notEmpty", label: "不为空" }, { op: "empty", label: "为空" },
 ];
+const CUSTOM_TEXT_OPERATORS = [...DP_OPERATORS.slice(0, 3), { op: "containsAny", label: "包含任一项 (OR)" }, ...DP_OPERATORS.slice(3)];
+const CUSTOM_MAX_DEPTH = 8, CUSTOM_MAX_NODES = 200;
+function splitCustomValues(value) { return [...new Set(String(value || "").split(/[;；\r\n]+/).map((v) => v.trim().toLowerCase()).filter(Boolean))]; }
 function isDateField(key) { return ["created", "updated"].includes(key) || (schemaByKey.get(key) || {}).type === "date"; }
 function filterConditionOperators(key, currentOp) {
-  if (!isDateField(key)) return DP_OPERATORS;
+  if (!isDateField(key)) return CUSTOM_TEXT_OPERATORS;
   const old = DP_OPERATORS.find((o) => o.op === currentOp);
   return old && !DATE_OPERATORS.some((o) => o.op === currentOp) ? [...DATE_OPERATORS, { ...old, label: "原文本条件：" + old.label, legacy: true }] : DATE_OPERATORS;
 }
@@ -231,6 +234,7 @@ function isoDate(value) {
 }
 function customConditionReady(c) {
   if (!c) return false;
+  if (c.op === "containsAny") return splitCustomValues(c.val).length > 0;
   if (["empty", "notEmpty"].includes(c.op)) return true;
   if (!String(c.val == null ? "" : c.val).trim()) return false;
   if (!isDateField(c.field) || !DATE_OPERATORS.some((o) => o.op === c.op)) return true;
@@ -470,6 +474,7 @@ function evalDpCondition(r, cond) {
     case "eq": return sv.toLowerCase() === target.toLowerCase();
     case "neq": return sv.toLowerCase() !== target.toLowerCase();
     case "contains": return target !== "" && sv.toLowerCase().includes(target.toLowerCase());
+    case "containsAny": return splitCustomValues(target).some((value) => sv.toLowerCase().includes(value));
     case "notContains": return target === "" || !sv.toLowerCase().includes(target.toLowerCase());
     case "in": {
       const set = new Set(target.split(/[,，;；|\s]+/).map((x) => x.trim().toLowerCase()).filter(Boolean));
@@ -482,23 +487,92 @@ function evalDpCondition(r, cond) {
 }
 
 /* 查询条件沿用详情模板的字段、运算符与“无”值口径；未填完的条件暂不参与筛选。 */
-function normalizeCustomConditions(conditions) {
-  if (!Array.isArray(conditions)) return [];
-  return conditions.filter((c) => c && schemaByKey.has(c.field) && !MDM_HIDDEN_KEYS.has(c.field)
-    && filterConditionOperators(c.field, c.op).some((o) => o.op === c.op))
-    .map((c) => ({ field: c.field, op: c.op, val: String(c.val == null ? "" : c.val).trim(),
-      ...(c.op === "between" ? { valTo: String(c.valTo == null ? "" : c.valTo).trim() } : {}) }));
+function validateCustomConditions(conditions) {
+  let count = 0;
+  function check(items, depth) {
+    if (!Array.isArray(items) || depth > CUSTOM_MAX_DEPTH) throw new Error("条件组格式不正确或嵌套过深");
+    for (const c of items) {
+      if (++count > CUSTOM_MAX_NODES || !c || typeof c !== "object" || Array.isArray(c)) throw new Error("条件配置格式不正确或数量过多");
+      if (c.type === "group") {
+        if (!["AND", "OR"].includes(c.logic)) throw new Error("条件组必须选择 AND 或 OR");
+        check(c.conditions, depth + 1);
+      } else if ((c.type && c.type !== "condition") || typeof c.field !== "string" || typeof c.op !== "string") throw new Error("条件配置格式不正确");
+    }
+  }
+  check(conditions, 0);
 }
-function activeCustomConditions() { return normalizeCustomConditions(state.filters.customConditions).filter(customConditionReady); }
+function normalizeCustomConditions(conditions) {
+  let count = 0;
+  function clean(items, depth) {
+    if (!Array.isArray(items) || depth > CUSTOM_MAX_DEPTH) return [];
+    const result = [];
+    for (const c of items) {
+      if (++count > CUSTOM_MAX_NODES) break;
+      if (!c || typeof c !== "object") continue;
+      if (c.type === "group") {
+        result.push({ type: "group", logic: c.logic === "OR" ? "OR" : "AND", conditions: clean(c.conditions, depth + 1) });
+      } else if (schemaByKey.has(c.field) && !MDM_HIDDEN_KEYS.has(c.field) && filterConditionOperators(c.field, c.op).some((o) => o.op === c.op)) {
+        result.push({ field: c.field, op: c.op, val: String(c.val == null ? "" : c.val).trim(),
+          ...(c.op === "between" ? { valTo: String(c.valTo == null ? "" : c.valTo).trim() } : {}) });
+      }
+    }
+    return result;
+  }
+  return clean(conditions, 0);
+}
+function customFilterEntries(items = state.filters.customConditions, parent = "") {
+  const result = [];
+  for (const [index, node] of (items || []).entries()) {
+    const path = parent ? parent + "." + index : String(index);
+    result.push({ node, path });
+    if (node.type === "group") result.push(...customFilterEntries(node.conditions, path));
+  }
+  return result;
+}
+function customFilterNode(path) {
+  if (!/^\d+(?:\.\d+)*$/.test(String(path))) return null;
+  let list = state.filters.customConditions, node;
+  for (const part of String(path).split(".")) {
+    node = list && list[Number(part)];
+    if (!node) return null;
+    list = node.type === "group" ? node.conditions : null;
+  }
+  return node;
+}
+function customFilterChildren(path = "") {
+  if (path === "") return state.filters.customConditions;
+  const node = customFilterNode(path);
+  return node && node.type === "group" ? node.conditions : null;
+}
+function customConditionPathLabel(path) { return String(path).split(".").map((p) => Number(p) + 1).join("."); }
+function activeCustomConditions() { return customFilterEntries(normalizeCustomConditions(state.filters.customConditions)).filter(({ node }) => node.type !== "group" && customConditionReady(node)).map(({ node }) => node); }
+function activeCustomTree(items = normalizeCustomConditions(state.filters.customConditions), logic = state.filters.customLogic) {
+  const children = items.map((c) => c.type === "group" ? activeCustomTree(c.conditions, c.logic) : customConditionReady(c) ? c : null).filter(Boolean);
+  return children.length ? { type: "group", logic: logic === "OR" ? "OR" : "AND", conditions: children } : null;
+}
+function customFilterNodeLabel(c) {
+  if (c.type === "group") {
+    const labels = c.conditions.map(customFilterNodeLabel).filter(Boolean);
+    return labels.length ? "（" + labels.join(c.logic === "OR" ? " 或 " : " 且 ") + "）" : "";
+  }
+  const field = schemaByKey.get(c.field), op = filterConditionOperators(c.field, c.op).find((o) => o.op === c.op);
+  return field && op && customConditionReady(c) ? field.label + " " + op.label + (["empty", "notEmpty"].includes(c.op) ? "" : " " + customConditionValueLabel(c)) : "";
+}
 function prepareCustomFilterMatches() {
-  const conditions = activeCustomConditions();
+  const tree = activeCustomTree();
   state._customMatches = null;
-  if (!conditions.length) return;
-  const any = state.filters.customLogic === "OR";
+  if (!tree) return;
+  const compile = (c) => {
+    if (c.type !== "group") {
+      if (c.op === "containsAny") { const values = splitCustomValues(c.val); return (r) => values.some((v) => String(r[c.field] ?? "").toLowerCase().includes(v)); }
+      return (r) => evalDpCondition(r, c);
+    }
+    const tests = c.conditions.map(compile);
+    return c.logic === "OR" ? (r) => tests.some((test) => test(r)) : (r) => tests.every((test) => test(r));
+  };
+  const match = compile(tree);
   // 每次查询只计算一次，供各分类胶囊的联动计数共用。
-  state._customMatches = new Set(rows.filter((r) => any
-    ? conditions.some((c) => evalDpCondition(r, c))
-    : conditions.every((c) => evalDpCondition(r, c))).map((r) => r.material));
+  state._customMatches = new Set(rows.filter(match).map((r) => r.material));
 }
 
 function matchDpTemplateForSku(r) {

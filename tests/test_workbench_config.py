@@ -18,6 +18,25 @@ def document(name):
 
 
 class ConfigStoreTests(unittest.TestCase):
+    def test_nested_query_conditions_roundtrip_and_reject_malformed_groups(self):
+        doc = document("嵌套条件")
+        doc["settings"]["v"] = 7
+        tree = [{"type": "group", "logic": "OR", "conditions": [
+            {"field": "desc", "op": "containsAny", "val": "面巾；餐巾"},
+            {"type": "group", "logic": "AND", "conditions": [
+                {"field": "created", "op": "gte", "val": "20260101"}]}]}]
+        doc["settings"]["filters"] = {"customLogic": "AND", "customConditions": tree}
+        self.store.save(doc)
+        self.assertEqual(self.store.read()["config"]["settings"]["filters"]["customConditions"], tree)
+        for invalid in ([{"type": "group", "logic": "XOR", "conditions": []}],
+                        [{"type": "group", "logic": "AND", "conditions": "invalid"}],
+                        [{"type": "group", "logic": "OR", "conditions": [{}]}]):
+            bad = json.loads(json.dumps(doc))
+            bad["settings"]["filters"]["customConditions"] = invalid
+            with self.assertRaises(ValueError):
+                self.store.save(bad)
+            self.assertEqual(self.store.read()["config"], doc)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
