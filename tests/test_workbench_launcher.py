@@ -14,6 +14,8 @@ import threading
 import time
 import unittest
 from unittest.mock import patch
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -34,7 +36,7 @@ class LauncherTests(unittest.TestCase):
             def git(_root, *args):
                 return {('rev-parse','--show-toplevel'):str(target),('remote','get-url','origin'):'https://github.com/JeremyKueng/MDM-Advanced-Query-Console.git',('branch','--show-current'):'main'}[args]
             profile = Path(directory) / 'original-profile'
-            with patch('workbench_update.git',side_effect=git):
+            with patch.object(launcher,'runtime_git',side_effect=git):
                 self.assertEqual(launcher.linked_runtime(root),target.resolve())
             with patch.object(launcher,'config_directory',return_value=profile), patch.object(launcher.subprocess,'run') as run:
                 run.return_value.returncode = 0
@@ -55,24 +57,31 @@ class LauncherTests(unittest.TestCase):
             target=root/'release';(target/'scripts').mkdir(parents=True)
             (target/'scripts/launch_workbench.py').write_text('# release launcher')
             marker.write_text(json.dumps({'version':1,'directory':str(target)}))
-            with patch('workbench_update.git',side_effect=[str(target),'https://github.com/other/untrusted.git']):
+            with patch.object(launcher,'runtime_git',side_effect=[str(target),'https://github.com/other/untrusted.git']):
                 with self.assertRaisesRegex(RuntimeError,'GitHub'):launcher.linked_runtime(root)
             (target/marker.name).write_text('{}')
             with self.assertRaisesRegex(RuntimeError,'循环'):launcher.linked_runtime(root)
 
     def test_detached_service_survives_launcher_and_is_reused(self):
         with tempfile.TemporaryDirectory() as directory:
+            project=Path(directory)/'project';(project/'scripts').mkdir(parents=True)
+            for name in ('launch_workbench.py','serve.py','source_settings.py','workbench_config.py'):
+                shutil.copy2(ROOT/'scripts'/name,project/'scripts'/name)
             with socket.socket() as probe:
                 probe.bind(("127.0.0.1", 0))
                 port = probe.getsockname()[1]
             environment = {**os.environ, "MDM_WORKBENCH_CONFIG_DIR": directory}
-            command = [sys.executable, str(ROOT / "scripts/launch_workbench.py"), "--port", str(port), "--no-browser"]
+            command = [sys.executable, str(project / "scripts/launch_workbench.py"), "--port", str(port), "--no-browser"]
             result = subprocess.run(command, env=environment, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=15)
             self.assertEqual(result.returncode, 0, result.stderr)
             info = launcher.health(port)
             self.assertIsNotNone(info, "启动器已退出，服务仍应可访问")
             pid = info["pid"]
             try:
+                for endpoint in ('/api/app-update', '/api/app-update/restart'):
+                    request=Request('http://127.0.0.1:%d%s' % (port,endpoint),data=b'{}',headers={'Content-Type':'application/json'})
+                    with self.assertRaises(HTTPError) as removed:urlopen(request,timeout=2)
+                    self.assertEqual(removed.exception.code,404,'old pages cannot invoke removed update endpoints')
                 repeated = subprocess.run(command, env=environment, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
                 self.assertEqual(repeated.returncode, 0, repeated.stderr)
                 self.assertIn("已连接现有后台服务", repeated.stdout)
@@ -90,7 +99,7 @@ class LauncherTests(unittest.TestCase):
             root=Path(directory)/'development';target=Path(directory)/'release';profile=Path(directory)/'profile'
             for folder in (root,target):
                 (folder/'scripts').mkdir(parents=True)
-                for name in ('launch_workbench.py','serve.py','workbench_update.py','source_settings.py','workbench_config.py'):
+                for name in ('launch_workbench.py','serve.py','source_settings.py','workbench_config.py'):
                     shutil.copy2(ROOT/'scripts'/name,folder/'scripts'/name)
             for args in (['init','-b','main'],['remote','add','origin','https://github.com/JeremyKueng/MDM-Advanced-Query-Console.git']):
                 subprocess.run(['git','-C',str(target),*args],check=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)

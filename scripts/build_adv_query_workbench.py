@@ -29,7 +29,7 @@ def main() -> None:
         "/*__DATASET__*/": 'const DATASET_B64 = "' + dataset_b64 + '";',
         "/*__APP_CORE__*/": read(ADVQ / "advq.core.js") + "\nconst PROCESS_DEFAULTS = " + read(ADVQ / "process-rules.defaults.json").strip() + ";\n" + read(ADVQ / "advq.process.js") + "\n" + read(ADVQ / "advq.config.js"),
         "/*__APP_VIEWS__*/": read(ADVQ / "advq.views.js") + "\n" + read(ADVQ / "advq.views2.js"),
-        "/*__APP_EVENTS__*/": read(ADVQ / "advq.sorting.js") + "\n" + read(ADVQ / "advq.dates.js") + "\n" + read(ADVQ / "advq.searchdock.js") + "\n" + read(ADVQ / "advq.update.js") + "\n" + read(ADVQ / "advq.columns.js") + "\n" + read(ADVQ / "advq.events.js"),
+        "/*__APP_EVENTS__*/": read(ADVQ / "advq.sorting.js") + "\n" + read(ADVQ / "advq.dates.js") + "\n" + read(ADVQ / "advq.searchdock.js") + "\n" + read(ADVQ / "advq.source-settings.js") + "\n" + read(ADVQ / "advq.columns.js") + "\n" + read(ADVQ / "advq.events.js"),
     }
     html = template
     for placeholder, content in parts.items():

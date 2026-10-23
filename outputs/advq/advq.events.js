@@ -786,8 +786,7 @@ async function openSourceModal() {
   let shareUnc = m.shareUnc || "", shareSmb = "";
   let connectionVersion = 0;
 
-  box.innerHTML = '<div class="source-dialog-heading"><h3>' + ic("database", 16) + ' 更新数据源</h3><button type="button" class="tool-btn" id="btnAppUpdate">' + ic("refresh", 12) + ' 检查版本更新</button></div>'
-    + '<p class="app-update-status" id="appUpdateStatus" role="status" aria-live="polite" hidden></p>'
+  box.innerHTML = '<h3>' + ic("database", 16) + ' 更新数据源</h3>'
     + '<div class="source-current"><small>当前数据</small><strong>' + esc(m.source || "—") + '</strong>'
     + '<span class="source-file-meta">' + (m.sourceRows || 0).toLocaleString() + ' 条记录 · 报表时间 ' + esc(m.sourceStamp || "—") + '</span></div>'
     + '<div class="src-route-card recommend" id="sourceSharePanel"></div>'
@@ -815,7 +814,6 @@ async function openSourceModal() {
     if (typeof syncBodyScrollLock === "function") syncBodyScrollLock();
   };
   document.getElementById("modalCloseSrc").onclick = close;
-  if (typeof bindWorkbenchUpdateButton === "function") bindWorkbenchUpdateButton();
   if (typeof bindSourceSettingsEditor === "function") bindSourceSettingsEditor(isCurrent, refreshConnection);
   mask.onclick = (e) => { if (e.target === mask) close(); };
 
@@ -2692,7 +2690,6 @@ async function init() {
   refreshAll();
   warmSourceInfo();
   document.getElementById("loading").classList.add("hide");
-  if (typeof notifyWorkbenchUpdated === "function") notifyWorkbenchUpdated();
   if (deepLinkMiss) {
     toast("URL 指定的物料未找到：" + deepLinkMiss + "（可用物料编码或 V码）", true);
   } else if (firstOpen && !state.detailPage) {

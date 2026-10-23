@@ -10,6 +10,7 @@ import sys
 import time
 from urllib.error import HTTPError, URLError
 from urllib.request import ProxyHandler, Request, build_opener
+from urllib.parse import urlparse
 import webbrowser
 
 from workbench_config import config_directory
@@ -18,8 +19,30 @@ ROOT = Path(__file__).resolve().parents[1]
 SERVICE = "mdm-advanced-query-console"
 
 
+def runtime_git(root, *args):
+    """仅查询本机运行副本信息，不访问远端或检查版本。"""
+    options = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
+    try:
+        result = subprocess.run(["git", "-C", str(root), *args], stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, timeout=5, **options)
+        if result.returncode:
+            raise RuntimeError("无法读取正式运行目录的 Git 信息")
+        return result.stdout.decode("utf-8", "replace").strip()
+    except (OSError, subprocess.TimeoutExpired):
+        raise RuntimeError("无法读取正式运行目录，请检查本机 Git 与目录是否可用")
+
+
+def official_runtime_remote(value):
+    if value.startswith("git@github.com:"):
+        value = "https://github.com/" + value.split(":", 1)[1]
+    parsed = urlparse(value)
+    return (parsed.scheme in ("https", "ssh") and parsed.hostname == "github.com"
+            and parsed.username in (None, "git") and not parsed.password
+            and parsed.path.rstrip("/").lower() in ("/jeremykueng/mdm-advanced-query-console", "/jeremykueng/mdm-advanced-query-console.git"))
+
+
 def linked_runtime(root=ROOT):
-    """保留原启动入口，转到独立的 GitHub 发布副本；开发仓库不参与在线更新。"""
+    """保留原启动入口，使用已在本机安装的独立正式副本。"""
     marker = root / "workbench-runtime.local.json"
     if not marker.exists():
         return None
@@ -32,8 +55,7 @@ def linked_runtime(root=ROOT):
         if target == root.resolve() or (target / marker.name).exists() or not (target / "scripts/launch_workbench.py").is_file():
             raise ValueError("正式运行目录不存在或存在循环跳转")
         # 不执行标记指向的任意程序，只接受本项目的 main 发布副本。
-        from workbench_update import canonical_remote, git, PUBLISH_REPO
-        if Path(git(target, "rev-parse", "--show-toplevel")).resolve() != target or canonical_remote(git(target, "remote", "get-url", "origin")) != canonical_remote(PUBLISH_REPO) or git(target, "branch", "--show-current") != "main":
+        if Path(runtime_git(target, "rev-parse", "--show-toplevel")).resolve() != target or not official_runtime_remote(runtime_git(target, "remote", "get-url", "origin")) or runtime_git(target, "branch", "--show-current") != "main":
             raise ValueError("正式运行目录不是本项目的 GitHub main 克隆版本")
         return target
     except (OSError, ValueError, KeyError, TypeError, RuntimeError) as error:

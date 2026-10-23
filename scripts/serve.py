@@ -25,7 +25,6 @@ from datetime import datetime
 from urllib.parse import urlparse
 from workbench_config import ConfigStore, MAX_BYTES
 from source_settings import SourceSettingsStore
-from workbench_update import AppUpdater, loaded_version, BUSY
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"
@@ -39,8 +38,6 @@ GZIP_MIN_BYTES = 1024
 _gzip_cache = {}  # key=(path, mtime_ns, size) -> bytes
 _personal_config = ConfigStore()
 _source_config = SourceSettingsStore(ROOT)
-_app_updater = AppUpdater(ROOT)
-_loaded_version = loaded_version(ROOT)
 _data_lock = threading.Lock()
 
 
@@ -83,8 +80,6 @@ def _rebuild_all(source_path: str = "", auto_share: bool = False, share_dir: str
     """调用 build_adv_query_dataset + build_adv_query_workbench 重建最新数据与单文件 HTML。"""
     with _data_lock:
         import importlib
-        if _app_updater.status()["phase"] in BUSY:
-            raise RuntimeError("程序正在更新，请完成后再导入或刷新物料数据")
         bad = _get_bad_module()
         share_dir = share_dir or source_preferences().get("sharePath", "")
         import build_adv_query_workbench as baw
@@ -114,7 +109,7 @@ class NoCacheHandler(SimpleHTTPRequestHandler):
             parsed = urlparse(origin)
             valid = valid and parsed.scheme == "http" and parsed.hostname in allowed and (parsed.port or 80) == self.server.server_port
         if not valid:
-            self._send_json(403, {"ok": False, "error": "仅允许本机服务页面操作程序更新与数据源设置"})
+            self._send_json(403, {"ok": False, "error": "仅允许本机服务页面操作数据源设置"})
         return valid
 
     def _send_json(self, code: int, payload: dict) -> None:
@@ -127,18 +122,17 @@ class NoCacheHandler(SimpleHTTPRequestHandler):
 
     def _handle_api_get(self) -> bool:
         p = self.path.split("?", 1)[0]
-        if p in ("/api/app-update", "/api/source-settings"):
-            if not self._local_request(allow_file=p == "/api/source-settings"):
+        if p == "/api/source-settings":
+            if not self._local_request(allow_file=True):
                 return True
             try:
-                data = ({**_app_updater.status(), "currentVersion": _loaded_version} if p == "/api/app-update"
-                        else {"ok": True, "settings": source_preferences(persist=True)})
+                data = {"ok": True, "settings": source_preferences(persist=True)}
                 self._send_json(200, data)
             except (ValueError, OSError, RuntimeError) as error:
                 self._send_json(400, {"ok": False, "error": str(error)})
             return True
         if p == "/api/health":
-            self._send_json(200, {"ok": True, "service": "mdm-advanced-query-console", "pid": os.getpid(), "version": _loaded_version})
+            self._send_json(200, {"ok": True, "service": "mdm-advanced-query-console", "pid": os.getpid()})
             return True
         if p == "/api/user-config":
             origin = self.headers.get("Origin")
@@ -215,8 +209,8 @@ class NoCacheHandler(SimpleHTTPRequestHandler):
     def do_POST(self):
         p = self.path.split("?", 1)[0]
         length = int(self.headers.get("Content-Length") or 0)
-        if p in ("/api/app-update", "/api/app-update/restart", "/api/source-settings"):
-            if not self._local_request(allow_file=p == "/api/source-settings"):
+        if p == "/api/source-settings":
+            if not self._local_request(allow_file=True):
                 return
             if not 0 < length <= 16384 or self.headers.get_content_type() != "application/json":
                 self._send_json(400, {"ok": False, "error": "请求格式不正确"})
@@ -225,24 +219,8 @@ class NoCacheHandler(SimpleHTTPRequestHandler):
                 req = json.loads(self.rfile.read(length).decode("utf-8"))
                 if not isinstance(req, dict):
                     raise ValueError("请求格式不正确")
-                if p == "/api/source-settings":
-                    settings = _source_config.save_shared_path(req.get("sharePath", ""), source_preferences())
-                    self._send_json(200, {"ok": True, "settings": settings})
-                elif p == "/api/app-update/restart":
-                    job = json.loads(_app_updater.job_path.read_text(encoding="utf-8"))
-                    if not req.get("jobId") or req["jobId"] != job["id"] or _app_updater.status()["phase"] != "restarting" or job["pid"] != os.getpid():
-                        raise ValueError("重启任务无效，未停止当前服务")
-                    self._send_json(200, {"ok": True})
-                    threading.Thread(target=self.server.shutdown, daemon=True).start()
-                else:
-                    if not _data_lock.acquire(blocking=False):
-                        raise RuntimeError("正在导入或刷新物料数据，请完成后再检查程序更新")
-                    try:
-                        source_preferences(persist=True)
-                        service = "mdm-advanced-query-console"
-                        self._send_json(202, _app_updater.start(self.server.server_port, os.getpid(), service))
-                    finally:
-                        _data_lock.release()
+                settings = _source_config.save_shared_path(req.get("sharePath", ""), source_preferences())
+                self._send_json(200, {"ok": True, "settings": settings})
             except (ValueError, OSError, RuntimeError) as error:
                 self._send_json(400, {"ok": False, "error": str(error)})
             return
