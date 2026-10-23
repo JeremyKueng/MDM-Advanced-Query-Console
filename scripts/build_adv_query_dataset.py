@@ -220,7 +220,15 @@ DEFAULT_VISIBLE = [
     "score", "issueCount", "blocking", "flags", "pack", "pre",
 ]
 VIEW_PRESETS = {
-    "核心视图": ["material", "vcode", "spec", "desc", "status", "cat", "load", "unit", "brand", "制造类别", "created"],
+    # 基础识别 → 分类定位 → 关键工艺 → 重量核对 → 箱规；保留原始制造类别。
+    "核心视图": [
+        "material", "vcode", "spec", "desc", "status", "brand", "unit",
+        "formula", "制造类别", "cat", "stock",
+        "压线/压花", "层数", "折数", "纸长", "纸宽", "纸盒尺寸",
+        "中包包装方式", "小卷形状", "标准/迷你", "张/片数", "码数", "series", "单/多片装", "是否悬挂式",
+        "单包高度", "quant", "rollNet",
+        "load", "pack", "装箱方式", "长(外包装)", "宽(外包装)", "高(外包装)", "created",
+    ],
     "质量视图": ["material", "vcode", "spec", "desc", "cat", "score", "issueCount", "blocking", "flags", "vconf", "pdfCount", "pdfBlock"],
     "包装视图": ["material", "vcode", "spec", "desc", "cat", "pack", "unit", "纸盒尺寸", "中包包装方式", "单提长", "单提宽", "单提高", "长(外包装)", "宽(外包装)", "高(外包装)", "装箱方式"],
     "工艺视图": ["material", "vcode", "spec", "desc", "cat", "制造类别", "配方", "关键工艺", "层数", "压线/压花", "粗压花", "加香/香型", "纸长", "纸宽", "抽(张)/包(盒)", "张/片数"],
