@@ -1064,6 +1064,73 @@ body:has(.basket-dock:not([hidden])) #toast {bottom:78px;}
 .material-detail-link {color:var(--blue-deep);text-decoration:none;border-bottom:1px dashed #9ec5fa;}
 .material-detail-link:hover {color:var(--blue);border-color:var(--blue);}
 
+
+/* 表头筛选与排序 */
+.column-heading {display:flex;align-items:center;gap:3px;min-width:0;}
+.column-heading button {border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;padding:0;display:inline-flex;align-items:center;}
+.column-heading .column-label {min-width:0;flex:1;text-align:left;gap:3px;white-space:nowrap;}
+.column-heading .column-dropdown {flex:none;border-radius:4px;padding:4px;margin:-4px 0;opacity:.65;}
+.column-heading button:hover,.column-filtered {color:var(--blue)!important;}
+.column-heading .column-dropdown:hover,.column-filtered .column-dropdown {background:#e1edff;opacity:1;}
+.column-heading button:focus-visible {outline:2px solid var(--blue);outline-offset:3px;}
+.column-filter-menu {position:fixed;z-index:120;width:min(340px,calc(100vw - 24px));max-height:calc(100dvh - 24px);display:flex;flex-direction:column;background:#fff;border:1px solid #c7d7ec;border-radius:12px;box-shadow:0 10px 40px #102a4c33;font-size:13px;overflow:hidden;color:var(--ink);}
+.column-filter-menu button {font:inherit;cursor:pointer;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:6px;padding:7px 11px;}
+.column-filter-menu button:hover {background:var(--blue-soft);color:var(--blue);}
+.column-filter-menu button:disabled {opacity:.4;cursor:default;}
+.column-filter-menu header {display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);}
+.column-filter-menu header strong {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.column-filter-menu header button {border:0;padding:3px;display:flex;}
+.column-sort-actions {display:flex;gap:8px;padding:10px 12px 4px;}
+.column-sort-actions button {flex:1;white-space:nowrap;}
+.column-sort-actions [aria-pressed=true] {background:var(--blue-soft);color:var(--blue);border-color:#a5c9fc;}
+.column-filter-menu .column-clear {margin:5px 12px 9px;border:0;display:flex;align-items:center;gap:7px;text-align:left;}
+.column-filter-content {padding:0 12px 8px;overflow:auto;min-height:0;}
+.column-filter-content>input {width:100%;border:1px solid #bfd2eb;border-radius:7px;padding:9px 10px;font:inherit;}
+.column-selection {display:flex;align-items:center;justify-content:space-between;padding:9px 0;gap:8px;}
+.column-selection label,.column-option {display:flex;align-items:center;gap:8px;cursor:pointer;}
+.column-selection input,.column-option input {accent-color:var(--blue);width:15px;height:15px;flex:none;margin:0;}
+.column-selection button {border:0;padding:2px;color:var(--blue);}
+.column-values {max-height:245px;overflow:auto;border:1px solid var(--line);border-radius:7px;overscroll-behavior:contain;}
+.column-option {padding:7px 9px;min-height:33px;}
+.column-option:hover {background:var(--blue-soft);}
+.column-option>span {flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.column-option small {font-variant-numeric:tabular-nums;color:var(--muted);}
+.column-no-values {padding:20px;color:var(--muted);text-align:center;}
+.column-filter-menu .column-more {border:0;color:var(--blue);width:100%;}
+.column-filter-menu [data-column-summary] {font-size:12px;color:var(--muted);margin:9px 0 5px;}
+.column-filter-note {display:block;color:var(--subtle);font-size:11px;line-height:1.5;}
+.column-filter-menu footer {display:flex;justify-content:flex-end;gap:8px;border-top:1px solid var(--line);padding:10px 12px;flex:none;}
+.column-filter-menu footer .primary {background:var(--blue);color:#fff;border-color:var(--blue);}
+.column-filter-menu [hidden] {display:none;}
+
+
+/* 专业工具仅占用查询结果区域；上方搜索与筛选始终可操作。 */
+#tabBar {align-items:center;justify-content:space-between;overflow:visible;flex-wrap:nowrap;}
+#tabBar .tools-entry {margin-left:auto;border:1px solid var(--line);color:var(--blue-deep);background:#fff;}
+#tabBar .tools-entry.on {border-color:var(--blue);background:var(--blue-soft);color:var(--blue);}
+.workspace-stage {position:relative;min-width:0;}
+.tools-workspace {height:clamp(560px,calc(100dvh - 145px),860px);display:flex;flex-direction:column;overflow:hidden;background:#fff;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);}
+.tools-workspace[hidden] {display:none;}
+.tools-workspace-header {display:flex;align-items:center;gap:14px;padding:13px 16px;border-bottom:1px solid var(--line);background:#fff;flex:none;}
+.tools-workspace-header strong {font-size:15px;color:var(--blue-deep);}
+.tools-workspace-header>span {font-size:12px;color:var(--muted);}
+.tools-workspace-header>button {margin-left:auto;}
+.tools-workspace-body {display:flex;flex:1;min-height:0;}
+.tools-nav {width:210px;flex:none;overflow-y:auto;background:#f7fafd;border-right:1px solid var(--line);padding:14px 10px;}
+.tools-nav p {font-size:11px;font-weight:650;letter-spacing:.5px;color:var(--subtle);margin:0 8px 9px;}
+.tools-nav p.tools-special-heading {border-top:1px solid var(--line);margin-top:15px;padding-top:16px;}
+.tools-nav>button {display:flex;align-items:center;gap:7px;width:100%;min-height:43px;border:0;border-radius:7px;padding:9px 8px;background:transparent;color:var(--muted);font-size:12px;font-weight:600;text-align:left;white-space:nowrap;}
+.tools-nav>button:hover {color:var(--blue);background:var(--blue-soft);}
+.tools-nav>button.on {color:var(--blue);background:#e5efff;}
+.tools-nav .cnt {margin-left:auto;font-size:10px;line-height:1.5;font-variant-numeric:tabular-nums;color:var(--muted);background:#eaf0f6;border-radius:6px;padding:1px 5px;}
+.tools-nav .special-label {display:none;}
+.tools-content {min-width:0;flex:1;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;}
+.tools-content>.sec {border:0;border-radius:0;box-shadow:none;margin:0;}
+.tools-content>.sec>.sec-head {position:sticky;top:0;z-index:18;background:#fff;flex-wrap:wrap;gap:8px;}
+.tools-content>.sec>.sec-head .sub {flex:1;min-width:180px;}
+@media(max-width:1000px) {.tools-nav{width:182px;padding:12px 6px;}.tools-nav>button{flex-wrap:wrap;gap:5px;}.tools-nav .cnt{font-size:10px;}.tools-content .sec-body{padding:12px;}}
+@media(max-width:650px) {.tools-workspace-header{gap:8px;padding:10px;}.tools-workspace-header>span{display:none;}.tools-workspace-body{flex-direction:column;}.tools-nav{width:auto;display:flex;overflow-x:auto;overflow-y:hidden;border-right:0;border-bottom:1px solid var(--line);padding:6px;gap:5px;}.tools-nav p{display:none;}.tools-nav>button{width:auto;flex:none;white-space:nowrap;min-height:34px;}.tools-nav .cnt{display:none;}.tools-nav>button[data-v=mps]{border-left:1px solid var(--line);border-radius:0;}.tools-content{min-height:0;}#tabBar .tools-entry{padding:8px;}}
+
 </style>
 </head>
 <body>
@@ -1103,21 +1170,12 @@ body:has(.basket-dock:not([hidden])) #toast {bottom:78px;}
     </div>
   </section>
 
-  <!-- 功能区标签页 -->
-  <nav class="tabbar" id="tabBar" aria-label="工作台功能">
-    <div class="tabbar-main" role="group" aria-label="MDM 主数据治理">
-      <button data-act="tab" data-v="results"></button>
-      <button data-act="tab" data-v="focus"></button>
-      <button data-act="tab" data-v="vconf"></button>
-      <button data-act="tab" data-v="process"></button>
-      <button data-act="tab" data-v="analyze"></button>
-      <button data-act="tab" data-v="rules"></button>
-    </div>
-    <div class="tabbar-special" role="group" aria-label="MPS 专项校验">
-      <button data-act="tab" data-v="mps" title="MPS 工艺路线专项校验"></button>
-    </div>
+  <!-- 日常查询只保留查询结果，专业看板统一收进下一层。 -->
+  <nav class="tabbar" id="tabBar" aria-label="查询与工具">
+    <button data-act="tab" data-v="results" aria-controls="panel-results"></button>
+    <button class="tools-entry" id="toolsEntry" data-act="tools-open" aria-expanded="false" aria-controls="toolsWorkspace"></button>
   </nav>
-
+  <div class="workspace-stage">
   <!-- 面板：查询结果 -->
   <section class="sec tabpanel on" id="panel-results">
     <div class="sec-head">
@@ -1133,6 +1191,20 @@ body:has(.basket-dock:not([hidden])) #toast {bottom:78px;}
     <div class="pager" id="pager"></div>
   </section>
 
+  <section class="tools-workspace" id="toolsWorkspace" aria-label="工具与分析" hidden>
+    <header class="tools-workspace-header"><strong>工具与分析</strong><span>共用上方搜索与筛选</span><button type="button" class="tool-btn" data-act="tools-close">返回查询结果 ✕</button></header>
+    <div class="tools-workspace-body">
+      <nav class="tools-nav" id="toolsNav" aria-label="工具分类">
+        <p>MDM 主数据治理</p>
+        <button data-act="tab" data-v="focus" aria-controls="panel-focus"></button>
+        <button data-act="tab" data-v="vconf" aria-controls="panel-vconf"></button>
+        <button data-act="tab" data-v="process" aria-controls="panel-process"></button>
+        <button data-act="tab" data-v="analyze" aria-controls="panel-analyze"></button>
+        <button data-act="tab" data-v="rules" aria-controls="panel-rules"></button>
+        <p class="tools-special-heading">MPS 专项</p>
+        <button data-act="tab" data-v="mps" aria-controls="panel-mps"></button>
+      </nav>
+      <div class="tools-content" id="toolsContent">
   <!-- 面板：重点关注（全宽具象化数据异常核查工作台） -->
   <section class="sec tabpanel" id="panel-focus">
     <div class="sec-head">
@@ -1205,6 +1277,10 @@ body:has(.basket-dock:not([hidden])) #toast {bottom:78px;}
     </div>
     <div class="sec-body" id="mpsBody"></div>
   </section>
+      </div>
+    </div>
+  </section>
+  </div>
 </main>
 
 <aside class="basket-dock" id="basketDock" aria-label="物料对比篮" hidden>
@@ -1325,6 +1401,7 @@ const ICONS = {
   ban: '<circle cx="12" cy="12" r="9"/><line x1="5.6" y1="5.6" x2="18.4" y2="18.4"/>',
   grid: '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',
   grip: '<circle cx="9" cy="5" r="1.4" fill="currentColor" stroke="none"/><circle cx="9" cy="9" r="1.4" fill="currentColor" stroke="none"/><circle cx="9" cy="13" r="1.4" fill="currentColor" stroke="none"/><circle cx="9" cy="17" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="5" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="9" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="13" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="17" r="1.4" fill="currentColor" stroke="none"/>',
+  "chevron-down": '<polyline points="6 9 12 15 18 9"/>',
   "chevron-left": '<polyline points="15 18 9 12 15 6"/>',
   "chevron-right": '<polyline points="9 18 15 12 9 6"/>',
   swap: '<path d="M7 4v13M3 13l4 4 4-4"/><path d="M17 20V7M13 11l4-4 4 4"/>',
@@ -1427,7 +1504,7 @@ const state = {
     status: "有效", pre: "", scope: "",
     onlyBlock: false, onlyIssue: false, onlyVconf: false, onlyBasket: false,
     onlyFieldIssue: "", onlyPdf: false, onlyPdfRule: "",
-    customLogic: "AND", customConditions: [],
+    customLogic: "AND", customConditions: [], columnFilters: {},
   },
   filterCollapsed: true,     // 日常查询先显示常用筛选，完整分类按需展开
   expandedMore: new Set(),   // 已展开“更多N个”的筛选行 key（展开后隐藏“更多N个”胶囊）
@@ -2124,9 +2201,43 @@ function exactMatchRank(r, qSpec) {
 }
 
 /* ---------- 计算层 ---------- */
+/* 表头按单元格显示值分组；空白单独保留，多列之间取交集。 */
+function columnValueKey(value) { return fmt(value).trim(); }
+function validateColumnFilters(filters) {
+  if (filters === undefined) return;
+  if (!filters || typeof filters !== "object" || Array.isArray(filters) || Object.keys(filters).length > 256) throw new Error("表头筛选格式不正确");
+  for (const [key, values] of Object.entries(filters)) {
+    if (!key || ["__proto__", "constructor", "prototype"].includes(key) || !Array.isArray(values) || values.length > 20000 || values.some(v => typeof v !== "string")) throw new Error("表头筛选值必须为文本列表");
+  }
+}
+function normalizeColumnFilters(filters) {
+  const out = {};
+  for (const [key, values] of Object.entries(filters || {})) {
+    if (schemaByKey.has(key) && !MDM_HIDDEN_KEYS.has(key) && Array.isArray(values)) out[key] = [...new Set(values.filter(v => typeof v === "string"))];
+  }
+  return out;
+}
+const COLUMN_COLLATOR = new Intl.Collator("zh-Hans-CN", { numeric: true });
+function compareColumnValues(a, b, type, dir = 1) {
+  const va = columnValueKey(a), vb = columnValueKey(b);
+  if (!va || !vb) return !va && !vb ? 0 : !va ? 1 : -1;
+  if (type === "number" && Number.isFinite(Number(a)) && Number.isFinite(Number(b))) return (Number(a) - Number(b)) * dir;
+  if (type === "date") return (va < vb ? -1 : va > vb ? 1 : 0) * dir;
+  return COLUMN_COLLATOR.compare(va, vb) * dir;
+}
+function columnFilterOptions(key) {
+  const counts = new Map();
+  for (const r of rowsInScope(["column:" + key])) {
+    const value = columnValueKey(r[key]); counts.set(value, (counts.get(value) || 0) + 1);
+  }
+  for (const value of state.filters.columnFilters?.[key] || []) if (!counts.has(value)) counts.set(value, 0);
+  const type = schemaByKey.get(key)?.type || "text";
+  return [...counts].map(([value, count]) => ({ value, count })).sort((a, b) => compareColumnValues(a.value, b.value, type));
+}
 const NO_SKIP = new Set();
 function passFilters(r, skip) {
   const f = state.filters;
+  for (const [key, selected] of state._columnTests || []) if (!skip.has("column:" + key) && !selected.has(columnValueKey(r[key]))) return false;
   if (!skip.has("custom") && state._customMatches && !state._customMatches.has(r.material)) return false;
   const cutoff = (DATASET.meta && DATASET.meta.createdCutoff) || "0000-00-00";
   if (!skip.has("status") && f.status && r.status !== f.status) return false;
@@ -2245,6 +2356,7 @@ function computeDerived() {
   state._qSpec = parseQuerySpec(state.q, state.qMode, state.qField);
   state.tokens = state._qSpec.tokens || [];
   prepareCustomFilterMatches();
+  state._columnTests = Object.entries(normalizeColumnFilters(state.filters.columnFilters)).map(([key, values]) => [key, new Set(values)]);
   const out = [];
   for (const r of rows) if (passFilters(r, NO_SKIP)) out.push(r);
   const key = state.sort.key, dir = state.sort.dir;
@@ -2252,19 +2364,12 @@ function computeDerived() {
   const hasQ = !state._qSpec.empty;
   out.sort((a, b) => {
     /* 若有搜索词且在默认排序下，自动把完全精准匹配的行排在最前，解决“全局模糊搜出一堆、精准命中的反而被淹没”的痛点 */
-    if (hasQ) {
+    if (hasQ && !state.sort.explicit) {
       const ra = exactMatchRank(a, state._qSpec);
       const rb = exactMatchRank(b, state._qSpec);
       if (ra !== rb) return rb - ra;
     }
-    const va = a[key], vb = b[key];
-    const na = va === null || va === undefined || va === "", nb = vb === null || vb === undefined || vb === "";
-    if (na && nb) return 0;
-    if (na) return 1;
-    if (nb) return -1;
-    if (type === "number") return (va - vb) * dir;
-    if (type === "date") return (va < vb ? -1 : va > vb ? 1 : 0) * dir;
-    return String(va).localeCompare(String(vb), "zh-Hans-CN") * dir;
+    return compareColumnValues(a[key], b[key], type, dir);
   });
   const pages = Math.max(1, Math.ceil(out.length / state.pageSize));
   if (state.page > pages) state.page = pages;
@@ -4107,7 +4212,7 @@ function normalizeQuickDetailView(view) {
 function captureUserSettings() {
   const f = state.filters;
   return {
-    v: 7, view: state.view, tab: state.tab, order: [...state.order], visible: orderedVisibleKeys(),
+    v: 8, view: state.view, tab: state.tab, order: [...state.order], visible: orderedVisibleKeys(),
     savedViews: state.savedViews, activeFieldView: state.activeFieldView, viewShortcuts: state.viewShortcuts,
     q: state.q, qMode: state.qMode, qField: state.qField, filterCollapsed: state.filterCollapsed, queryUiVersion: 1,
     queryViews: state.queryViews, activeQueryView: state.activeQueryView,
@@ -4115,7 +4220,7 @@ function captureUserSettings() {
     analyzeField: state.analyzeField, cmpDiffOnly: state.cmpDiffOnly,
     processRules: typeof processConfig !== "undefined" ? processConfig : null,
     dpTemplates: state.dpTemplates, dpShowClassicCols: state.dpShowClassicCols, quickDetailView: normalizeQuickDetailView(state.quickDetailView),
-    filters: { ...f, mfg: [...f.mfg], formula: [...f.formula], cats: [...f.cats], stocks: [...f.stocks], brands: [...f.brands], customConditions: normalizeCustomConditions(f.customConditions) },
+    filters: { ...f, mfg: [...f.mfg], formula: [...f.formula], cats: [...f.cats], stocks: [...f.stocks], brands: [...f.brands], customConditions: normalizeCustomConditions(f.customConditions), columnFilters: normalizeColumnFilters(f.columnFilters) },
     focusFilter: { ...state.focusFilter, page: 1 }, analyzeFilter: { ...state.analyzeFilter },
     vconfFilter: { ...state.vconfFilter, page: 1 }, processCheckFilter: { ...state.processCheckFilter, page: 1 }, mpsFilter: { ...state.mpsFilter, page: 1 },
   };
@@ -4127,7 +4232,7 @@ function decodeUserConfig(doc) {
     if (doc.schemaVersion !== 1) throw new Error("配置格式版本暂不支持，请保留原文件");
     s = doc.settings;
   } else if (doc.type && doc.type !== "wb_mdm_advq_backup") throw new Error("不是工作台个人配置文件");
-  if (!s || !Number.isInteger(s.v) || s.v < 1 || s.v > 7) throw new Error("配置版本无效或暂不支持");
+  if (!s || !Number.isInteger(s.v) || s.v < 1 || s.v > 8) throw new Error("配置版本无效或暂不支持");
   const arrayKeys = ["order", "visible", "basket", "expandedMore", "viewShortcuts"];
   for (const k of arrayKeys) if (k in s && (!Array.isArray(s[k]) || s[k].some((x) => typeof x !== "string"))) throw new Error(k + " 配置格式不正确");
   if (s.filters && (typeof s.filters !== "object" || Array.isArray(s.filters))) throw new Error("筛选配置格式不正确");
@@ -4140,6 +4245,8 @@ function decodeUserConfig(doc) {
   const checkConditions = (items) => {
     if (items !== undefined && (!Array.isArray(items) || items.some((c) => !c || typeof c.field !== "string" || typeof c.op !== "string"))) throw new Error("条件配置格式不正确");
   };
+  if (s.filters) validateColumnFilters(s.filters.columnFilters);
+  if (s.sort && "explicit" in s.sort && typeof s.sort.explicit !== "boolean") throw new Error("排序配置格式不正确");
   if (s.filters && s.filters.customConditions !== undefined) validateCustomConditions(s.filters.customConditions);
   for (const t of s.dpTemplates || []) {
     checkConditions(t.conditions);
@@ -4180,7 +4287,7 @@ function applyUserSettings(s) {
   state.queryViews = (s.queryViews || []).map((v) => ({ id: v.id, name: v.name.trim().slice(0, 40), context: normalizeQueryContext(v.context) }));
   state.activeQueryView = state.queryViews.some((v) => v.id === s.activeQueryView) ? s.activeQueryView : "";
   state.expandedMore = new Set(stringsOnly(s.expandedMore));
-  state.sort = s.sort && valid.has(s.sort.key) ? { key: s.sort.key, dir: s.sort.dir === -1 ? -1 : 1 } : { key: "material", dir: 1 };
+  state.sort = s.sort && valid.has(s.sort.key) ? { key: s.sort.key, dir: s.sort.dir === -1 ? -1 : 1, ...(s.sort.explicit !== undefined ? { explicit: s.sort.explicit } : {}) } : { key: "material", dir: 1 };
   state.pageSize = [50, 100, 200].includes(s.pageSize) ? s.pageSize : 50;
   state.page = 1;
   state.basket = stringsOnly(s.basket).filter((m) => byMaterial.has(m)).slice(0, 8);
@@ -4203,6 +4310,7 @@ function applyUserSettings(s) {
   state.filters.scope = f.scope === "created2y" ? f.scope : "";
   state.filters.customLogic = f.customLogic === "OR" ? "OR" : "AND";
   state.filters.customConditions = normalizeCustomConditions(f.customConditions);
+  state.filters.columnFilters = normalizeColumnFilters(f.columnFilters);
   state.focusFilter = { group: "", reason: "", q: "", sort: "severity", page: 1, pageSize: 40 };
   state.analyzeFilter = { q: "", sort: "issue", scopeMode: "scope", valMode: "top", family: "" };
   state.vconfFilter = { q: "", sort: "materials", expandAll: false, page: 1 };
@@ -4408,18 +4516,21 @@ function validateQueryViews(views) {
     if (!c.filters || typeof c.filters !== "object" || Array.isArray(c.filters)) throw new Error("我的查询筛选配置无效");
     for (const k of ["mfg", "formula", "cats", "stocks", "brands"]) if (!Array.isArray(c.filters[k]) || c.filters[k].some((x) => typeof x !== "string")) throw new Error("我的查询分类筛选无效");
     validateCustomConditions(c.filters.customConditions);
+    validateColumnFilters(c.filters.columnFilters);
+    if ("explicit" in c.sort && typeof c.sort.explicit !== "boolean") throw new Error("排序配置格式不正确");
     for (const k of ["status", "pre", "scope", "onlyFieldIssue", "onlyPdfRule"]) if (typeof c.filters[k] !== "string") throw new Error("我的查询状态筛选无效");
     for (const k of ["onlyBlock", "onlyIssue", "onlyVconf", "onlyBasket", "onlyPdf"]) if (typeof c.filters[k] !== "boolean") throw new Error("我的查询质量筛选无效");
     if (!["AND", "OR"].includes(c.filters.customLogic)) throw new Error("我的查询条件关系无效");
   }
 }
 function defaultQueryFilters(status = "有效") {
-  return { mfg: new Set(), formula: new Set(), cats: new Set(), stocks: new Set(), brands: new Set(), status, pre: "", scope: "", onlyBlock: false, onlyIssue: false, onlyVconf: false, onlyBasket: false, onlyFieldIssue: "", onlyPdf: false, onlyPdfRule: "", customLogic: "AND", customConditions: [] };
+  return { mfg: new Set(), formula: new Set(), cats: new Set(), stocks: new Set(), brands: new Set(), status, pre: "", scope: "", onlyBlock: false, onlyIssue: false, onlyVconf: false, onlyBasket: false, onlyFieldIssue: "", onlyPdf: false, onlyPdfRule: "", customLogic: "AND", customConditions: [], columnFilters: {} };
 }
 function queryFiltersFrom(saved) {
   const f = defaultQueryFilters();
   for (const key of Object.keys(f)) {
     if (f[key] instanceof Set) f[key] = new Set(stringsOnly(saved[key]));
+    else if (key === "columnFilters") f[key] = normalizeColumnFilters(saved[key]);
     else if (key === "customConditions") f[key] = normalizeCustomConditions(saved[key]);
     else if (typeof saved[key] === typeof f[key]) f[key] = saved[key];
   }
@@ -4431,7 +4542,7 @@ function captureQueryContext() {
   const f = state.filters;
   return { q: state.q, qMode: state.qMode, qField: state.qField, view: state.view,
     visible: orderedVisibleKeys(), order: [...state.order], sort: { ...state.sort },
-    filters: { ...f, mfg: [...f.mfg], formula: [...f.formula], cats: [...f.cats], stocks: [...f.stocks], brands: [...f.brands], customConditions: normalizeCustomConditions(f.customConditions) } };
+    filters: { ...f, mfg: [...f.mfg], formula: [...f.formula], cats: [...f.cats], stocks: [...f.stocks], brands: [...f.brands], customConditions: normalizeCustomConditions(f.customConditions), columnFilters: normalizeColumnFilters(f.columnFilters) } };
 }
 function normalizeQueryContext(c) {
   const valid = (a) => stringsOnly(a).filter((k) => schemaByKey.has(k) && !MDM_HIDDEN_KEYS.has(k));
@@ -4551,6 +4662,8 @@ function renderStaticButtons() {
   document.querySelector('#detailPage .back').innerHTML = ic("chevron-left", 14) + " 返回工作台";
   var cfgBack = document.querySelector('#dpConfigModal .back');
   if (cfgBack) cfgBack.innerHTML = ic("chevron-left", 14) + " 返回单品看板";
+  const toolsEntry = document.getElementById("toolsEntry");
+  if (toolsEntry) toolsEntry.innerHTML = ic("grid", 14) + " 工具与分析 " + ic("chevron-right", 13);
   var tabDefs = [
     ["results", "table", "查询结果", "tabCntResults"],
     ["focus", "star", "重点关注", "tabCntFocus"],
@@ -4560,7 +4673,7 @@ function renderStaticButtons() {
     ["rules", "file-text", "口径与规则", ""],
     ["mps", "route", 'MPS 工艺路线 <span class="special-label">专项</span>', "tabCntMps"],
   ];
-  Array.prototype.forEach.call(document.querySelectorAll('#tabBar button[data-act="tab"]'), function (b) {
+  Array.prototype.forEach.call(document.querySelectorAll('#tabBar button[data-act="tab"], #toolsNav button[data-act="tab"]'), function (b) {
     var v = b.getAttribute("data-v");
     for (var i = 0; i < tabDefs.length; i++) {
       if (tabDefs[i][0] === v) {
@@ -4610,10 +4723,15 @@ function renderTabs() {
     var mpsRows = (derived.filtered || []).filter(function (r) { return r.route && (r.routeStatus !== "完整" || routeIssueMap.has(r.material)); });
     cntM.textContent = mpsRows.length.toLocaleString() + " 待关注";
   }
-  Array.prototype.forEach.call(document.querySelectorAll('#tabBar button[data-act="tab"]'), function (b) {
+  Array.prototype.forEach.call(document.querySelectorAll('#tabBar button[data-act="tab"], #toolsNav button[data-act="tab"]'), function (b) {
     b.classList.toggle("on", b.getAttribute("data-v") === state.tab);
     b.setAttribute("aria-pressed", b.getAttribute("data-v") === state.tab ? "true" : "false");
   });
+  const toolOpen = state.tab !== "results";
+  if (toolOpen) state.lastToolTab = state.tab;
+  const workspace = document.getElementById("toolsWorkspace"), entry = document.getElementById("toolsEntry");
+  if (workspace) workspace.hidden = !toolOpen;
+  if (entry) { entry.classList.toggle("on", toolOpen); entry.setAttribute("aria-expanded", String(toolOpen)); }
   Array.prototype.forEach.call(document.querySelectorAll(".tabpanel"), function (p) {
     p.classList.toggle("on", p.id === "panel-" + state.tab);
   });
@@ -5059,6 +5177,10 @@ function buildActiveFilterLinkageTags(sizeCls, includeSearch = true, includeStat
   if (f.onlyBasket) tags.push(chip(true, "仅看对比篮 ✕", "toggle-only", 'data-v="onlyBasket"', cls));
   if (f.onlyPdfRule) tags.push(chip(true, "规则" + esc(f.onlyPdfRule) + " ✕", "pdf-rule-filter", 'data-v="' + esc(f.onlyPdfRule) + '"', cls + " warn"));
   if (f.onlyFieldIssue) tags.push(chip(true, "字段异常:" + esc(f.onlyFieldIssue) + " ✕", "clear-field-issue", "", cls + " warn"));
+  for (const [key, values] of Object.entries(f.columnFilters || {})) {
+    const label = schemaByKey.get(key)?.label || key;
+    tags.push(chip(true, "列·" + esc(label) + ":" + esc(values.length === 1 ? values[0] || '(空白)' : values.length + ' 项') + " ✕", "column-filter-clear", 'data-v="' + esc(key) + '" title="' + esc(values.join('；')) + '"', cls));
+  }
   const customCount = activeCustomConditions().length;
   if (customCount) {
     tags.push('<span class="custom-filter-relation">自定义·' + (f.customLogic === "OR" ? "任一满足" : "全部满足") + '：</span>');
@@ -5077,7 +5199,7 @@ function renderScopeLinkageBar(panelTitle, extraRightHtml) {
   const totalScoped = (derived && derived.total) || 0;
   const totalAll = (STATS && STATS.total) || rows.length;
   const f = state.filters;
-  const hasNonDefault = f.mfg.size || f.formula.size || f.cats.size || f.stocks.size || f.brands.size || f.status !== "有效" || f.pre || f.scope || f.onlyBlock || f.onlyIssue || f.onlyVconf || f.onlyBasket || f.onlyFieldIssue || f.onlyPdf || f.onlyPdfRule || activeCustomConditions().length || state.q;
+  const hasNonDefault = f.mfg.size || f.formula.size || f.cats.size || f.stocks.size || f.brands.size || f.status !== "有效" || f.pre || f.scope || f.onlyBlock || f.onlyIssue || f.onlyVconf || f.onlyBasket || f.onlyFieldIssue || f.onlyPdf || f.onlyPdfRule || activeCustomConditions().length || Object.keys(f.columnFilters || {}).length || state.q;
   return '<div class="scope-linkage-bar" data-scope-total="' + totalScoped + '" style="grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;background:#f4f9ff;border:1px solid #bfd8fa;border-radius:9px;padding:7px 12px;margin-bottom:10px;font-size:12px">'
     + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
     + '<span style="font-weight:750;color:var(--blue-deep)">🔗 已与上方筛选区实时联动（' + esc(panelTitle || "当前视图") + '基数：<b>' + totalScoped.toLocaleString() + '</b> / ' + totalAll.toLocaleString() + ' 条）：</span>'
@@ -5162,7 +5284,7 @@ function renderFilters() {
   /* 汇总当前已激活的筛选条件标签（供顶部紧凑折叠条与下方各展示面板实时联动显示） */
   const activeSummaryTags = buildActiveFilterLinkageTags("sm", false, false);
 
-  const anyFilter = f.mfg.size || f.formula.size || f.cats.size || f.stocks.size || f.brands.size || f.status !== "有效" || f.pre || f.scope || f.onlyBlock || f.onlyIssue || f.onlyVconf || f.onlyBasket || f.onlyFieldIssue || f.onlyPdf || f.onlyPdfRule || (f.customConditions || []).length || state.q;
+  const anyFilter = f.mfg.size || f.formula.size || f.cats.size || f.stocks.size || f.brands.size || f.status !== "有效" || f.pre || f.scope || f.onlyBlock || f.onlyIssue || f.onlyVconf || f.onlyBasket || f.onlyFieldIssue || f.onlyPdf || f.onlyPdfRule || (f.customConditions || []).length || Object.keys(f.columnFilters || {}).length || state.q;
   const collapsed = !!state.filterCollapsed;
 
   const quickOptions = (key, label, act) => '<select data-act="quick-filter" data-key="' + act + '" aria-label="按' + label + '筛选"><option value="">' + label + ' · 添加筛选</option>'
@@ -5239,7 +5361,7 @@ function renderResultLine() {
   const report = querySearchReport(), batch = report.batch;
   const source = '<span class="source-time" title="数据源：' + esc(DATASET.meta.source || '') + '">数据时间 ' + esc(DATASET.meta.sourceStamp || '未提供') + '</span>';
   let h = '<div class="result-feedback"><span>' + (state.q ? '搜索“' + esc(state.q.length > 45 ? state.q.slice(0, 45) + '…' : state.q).replace(/\n/g, ' · ') + '”' : '勾选物料可对比，点击编码或说明可速览') + '</span>'
-    + (state.q && !batch ? '<span>· ' + derived.total.toLocaleString() + ' 条匹配' + (state.qMode === 'smart' ? '，精准命中优先' : '') + '</span>' : '') + source + '</div>';
+    + (state.q && !batch ? '<span>· ' + derived.total.toLocaleString() + ' 条匹配' + (state.sort.explicit ? '，按' + esc(schemaByKey.get(state.sort.key)?.label || state.sort.key) + (state.sort.dir === 1 ? '升序' : '降序') : state.qMode === 'smart' ? '，精准命中优先' : '') + '</span>' : '') + source + '</div>';
   if (batch) {
     const detail = (label, codes, action) => !codes.length ? '' : '<div><b>' + label + ' ' + codes.length + ' 个</b> ' + (action ? '<button class="tool-btn" data-act="copy-query-codes" data-v="' + action + '">复制编码</button>' : '') + '<div class="batch-code-list">' + codes.map(esc).join('、') + '</div></div>';
     h += '<details class="batch-feedback"><summary>批量查码 <b>' + batch.total + '</b> 个 · 当前找到 <b>' + batch.found.length + '</b> 个 · 未找到 <b>' + batch.missing.length + '</b> 个 · 被筛选排除 <b>' + batch.excluded.length + '</b> 个 · 一码多料 <b>' + batch.ambiguous.length + '</b> 个'
@@ -5443,6 +5565,7 @@ function tableXnavHtml(tableId, colCount) {
     + '</div></div>';
 }
 function renderResults() {
+  if (typeof closeColumnFilterMenu === "function") closeColumnFilterMenu();
   renderViewShortcuts();
   renderQueryWorkspace();
   const body = document.getElementById("resultsBody");
@@ -5469,8 +5592,11 @@ function renderResults() {
     const on = state.sort.key === k;
     const stCls = (i < 4 ? " sticky-col sc-" + i : "") + (resultColumnClass(k) ? " " + resultColumnClass(k) : "") + (fieldLocator.key === k ? " field-located" : "");
     const pinBadge = i < 4 ? '<span style="font-size:10px;color:var(--blue);margin-left:2px" title="固定冻结列">📌</span>' : "";
-    h += '<th class="sortable' + stCls + '" data-field="' + esc(k) + '" data-act="sort" data-v="' + esc(k) + '" title="' + esc(s.group) + " · " + esc(s.type) + (i < 4 ? "（核心冻结列，左右滑动固定）" : "") + '">' + esc(s.label) + pinBadge
-      + (on ? '<span class="arrow">' + (state.sort.dir === 1 ? "▲" : "▼") + "</span>" : "") + "</th>";
+    const filtered = Object.prototype.hasOwnProperty.call(state.filters.columnFilters || {}, k);
+    h += '<th class="column-header' + stCls + (filtered ? ' column-filtered' : '') + '" data-field="' + esc(k) + '" aria-sort="' + (on ? state.sort.dir === 1 ? 'ascending' : 'descending' : 'none') + '"><div class="column-heading">'
+      + '<button type="button" class="column-label" data-column-action="open" data-field="' + esc(k) + '" aria-label="筛选和排序：' + esc(s.label) + '" aria-haspopup="dialog" aria-expanded="false">' + esc(s.label) + pinBadge
+      + (on ? '<span class="arrow">' + (state.sort.dir === 1 ? '▲' : '▼') + '</span>' : '') + '</button>'
+      + '<button type="button" class="column-dropdown" data-column-action="open" data-field="' + esc(k) + '" aria-label="' + esc(s.label) + (filtered ? '，已筛选' : '') + '筛选菜单" aria-haspopup="dialog" aria-expanded="false">' + ic(filtered ? 'filter' : 'chevron-down', 13) + '</button></div></th>';
   }
   h += '<th class="sticky-right" title="右侧固定冻结操作列">操作 📌</th></tr></thead><tbody>';
   for (const r of derived.pageRows) {
@@ -7940,6 +8066,7 @@ function preserveWorkspaceViewport(render) {
 }
 let workspaceRevision = 0;
 const workspacePanelCache = new Map();
+const workspaceToolScroll = new Map();
 function workspacePanelKey(tab) {
   const local = {focus:state.focusFilter,vconf:state.vconfFilter,process:state.processCheckFilter,mps:state.mpsFilter,analyze:[state.analyzeField,state.analyzeFilter]};
   return workspaceRevision + ':' + JSON.stringify(local[tab] || null);
@@ -7959,9 +8086,13 @@ function renderWorkspacePanel(force = false) {
 function switchWorkspaceTab(tab) {
   if (!['results','focus','vconf','analyze','rules','process','mps'].includes(tab) || tab === state.tab) return;
   preserveWorkspaceViewport(() => {
+    const content = typeof document.getElementById === 'function' ? document.getElementById('toolsContent') : null;
+    if (content && state.tab !== 'results') workspaceToolScroll.set(state.tab, content.scrollTop);
     state.tab = tab;
+    if (typeof closeColumnFilterMenu === "function") closeColumnFilterMenu();
     renderTabs();
     renderWorkspacePanel();
+    if (content && tab !== 'results') content.scrollTop = workspaceToolScroll.get(tab) || 0;
     if (typeof syncTableXnav === 'function') {
       const tables = {results:'mainTableWrap',process:'processCheckTableWrap',mps:'mpsTableWrap',focus:'focusTableWrap',vconf:'vconfTableWrap'};
       if (tables[tab]) syncTableXnav(tables[tab]);
@@ -8314,6 +8445,140 @@ function bindSearchDock() {
     },
   };
   update();
+}
+
+/* 表头筛选：草稿只在确定时生效；菜单挂在 body，避免被冻结列和滚动容器裁切。 */
+"use strict";
+let columnMenu = null;
+function columnOptionLabel(key, value) {
+  if (key === 'blocking') return value === 'true' || value === '1' ? '需重点核查' : '正常';
+  if (key === 'vconf') return value === 'true' || value === '1' ? '有冲突' : '无冲突';
+  if (key === 'flags' && !value) return '无异常';
+  return value || '(空白)';
+}
+function columnMenuMatches(menu = columnMenu) {
+  const tokens = menu.query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  return menu.options.filter(o => tokens.every(t => columnOptionLabel(menu.key, o.value).toLocaleLowerCase().includes(t)));
+}
+function closeColumnFilterMenu(restoreFocus = false) {
+  if (!columnMenu) return;
+  const { element, trigger, key } = columnMenu;
+  element.remove(); columnMenu = null;
+  if (trigger.isConnected) trigger.setAttribute('aria-expanded', 'false');
+  if (restoreFocus) {
+    const target = trigger.isConnected ? trigger : [...document.querySelectorAll('[data-column-action="open"]')].find(b => b.dataset.field === key);
+    target?.focus({ preventScroll: true });
+  }
+}
+function updateColumnMenuSelection() {
+  const menu = columnMenu; if (!menu) return;
+  const matches = columnMenuMatches(menu), selected = matches.filter(o => menu.selected.has(o.value)).length;
+  const all = menu.element.querySelector('[data-column-select-all]');
+  all.checked = matches.length > 0 && selected === matches.length;
+  all.indeterminate = selected > 0 && selected < matches.length;
+  all.disabled = !matches.length;
+  menu.element.querySelector('[data-column-summary]').textContent = '当前列表已选 ' + selected.toLocaleString() + ' / ' + matches.length.toLocaleString() + ' 个值';
+  menu.element.querySelector('[data-column-action="apply"]').disabled = !selected;
+}
+function renderColumnMenuValues() {
+  const menu = columnMenu; if (!menu) return;
+  const matches = columnMenuMatches(menu);
+  menu.element.querySelector('[data-column-values]').innerHTML = matches.slice(0, menu.limit).map(o => {
+    const i = menu.options.indexOf(o);
+    return '<label class="column-option"><input type="checkbox" data-column-index="' + i + '"' + (menu.selected.has(o.value) ? ' checked' : '') + '><span title="' + esc(columnOptionLabel(menu.key, o.value)) + '">' + esc(columnOptionLabel(menu.key, o.value)) + '</span><small>' + o.count.toLocaleString() + '</small></label>';
+  }).join('') || '<div class="column-no-values">没有匹配的值</div>';
+  const more = menu.element.querySelector('[data-column-action="more"]');
+  more.hidden = matches.length <= menu.limit;
+  more.textContent = '加载更多（还有 ' + Math.max(0, matches.length - menu.limit).toLocaleString() + ' 个值）';
+  updateColumnMenuSelection();
+}
+function openColumnFilterMenu(trigger) {
+  const key = trigger.dataset.field;
+  if (!schemaByKey.has(key) || MDM_HIDDEN_KEYS.has(key)) return;
+  if (columnMenu?.key === key) { closeColumnFilterMenu(true); return; }
+  closeColumnFilterMenu();
+  const schema = schemaByKey.get(key), options = columnFilterOptions(key);
+  const active = Object.prototype.hasOwnProperty.call(state.filters.columnFilters || {}, key);
+  const element = document.createElement('div');
+  element.className = 'column-filter-menu'; element.setAttribute('role', 'dialog');
+  element.setAttribute('aria-label', schema.label + '：筛选和排序');
+  const number = schema.type === 'number', date = schema.type === 'date';
+  const asc = number ? '从小到大' : date ? '从早到晚' : '升序 A → Z';
+  const desc = number ? '从大到小' : date ? '从晚到早' : '降序 Z → A';
+  element.innerHTML = '<header><strong>' + esc(schema.label) + '</strong><button type="button" data-column-action="cancel" aria-label="关闭表头筛选">' + ic('x', 15) + '</button></header>'
+    + '<div class="column-sort-actions"><button type="button" data-column-action="asc" aria-pressed="' + (state.sort.key === key && state.sort.dir === 1) + '">↑ ' + asc + '</button><button type="button" data-column-action="desc" aria-pressed="' + (state.sort.key === key && state.sort.dir === -1) + '">↓ ' + desc + '</button></div>'
+    + '<button type="button" class="column-clear" data-column-action="clear"' + (!active ? ' disabled' : '') + '>' + ic('filter', 13) + ' 清除此列筛选</button>'
+    + '<button type="button" class="column-clear" data-column-action="reset-sort"' + (!state.sort.explicit ? ' disabled' : '') + '>↺ 恢复默认排序</button>'
+    + '<div class="column-filter-content"><input type="search" data-column-search placeholder="搜索此列的值…" aria-label="搜索' + esc(schema.label) + '的值" autocomplete="off">'
+    + '<div class="column-selection"><label><input type="checkbox" data-column-select-all> 全选匹配值</label><button type="button" data-column-action="invert">反选</button></div>'
+    + '<div class="column-values" data-column-values></div><button type="button" class="column-more" data-column-action="more" hidden></button>'
+    + '<p data-column-summary aria-live="polite"></p><small class="column-filter-note">按单元格显示值筛选，与上方条件同时满足。搜索后仅应用匹配列表。</small></div>'
+    + '<footer><button type="button" data-column-action="cancel">取消</button><button type="button" class="primary" data-column-action="apply">确定</button></footer>';
+  columnMenu = { key, trigger, element, options, selected: new Set(active ? state.filters.columnFilters[key] : options.map(o => o.value)), query: '', limit: 100 };
+  document.body.appendChild(element); trigger.setAttribute('aria-expanded', 'true');
+  renderColumnMenuValues();
+  const rect = trigger.closest('th').getBoundingClientRect();
+  const width = element.offsetWidth, height = Math.min(element.offsetHeight, window.innerHeight - 24);
+  const left = Math.max(12, Math.min(rect.left, window.innerWidth - width - 12));
+  const top = rect.bottom + height + 8 <= window.innerHeight ? rect.bottom + 6 : Math.max(12, rect.top - height - 6);
+  element.style.left = left + 'px'; element.style.top = top + 'px';
+  element.querySelector('[data-column-search]').focus({ preventScroll: true });
+}
+function commitColumnMenu(action) {
+  const menu = columnMenu; if (!menu) return;
+  const key = menu.key;
+  if (action === 'asc' || action === 'desc') state.sort = { key, dir: action === 'asc' ? 1 : -1, explicit: true };
+  else if (action === 'reset-sort') state.sort = { key: 'material', dir: 1 };
+  else if (action === 'clear') delete state.filters.columnFilters[key];
+  else {
+    const selected = columnMenuMatches(menu).filter(o => menu.selected.has(o.value)).map(o => o.value);
+    if (!selected.length) return;
+    if (selected.length === menu.options.length) delete state.filters.columnFilters[key];
+    else state.filters.columnFilters[key] = selected;
+  }
+  closeColumnFilterMenu(); refreshFilteredViews();
+  const target = [...document.querySelectorAll('[data-column-action="open"]')].find(b => b.dataset.field === key);
+  target?.focus({ preventScroll: true });
+}
+function bindColumnFilters() {
+  document.addEventListener('pointerdown', e => {
+    if (columnMenu && !columnMenu.element.contains(e.target) && !e.target.closest('[data-column-action="open"]')) closeColumnFilterMenu();
+  });
+  document.addEventListener('click', e => {
+    const button = e.target.closest('[data-column-action]'); if (!button) return;
+    e.preventDefault(); e.stopPropagation();
+    const action = button.dataset.columnAction;
+    if (action === 'open') { openColumnFilterMenu(button); return; }
+    if (!columnMenu) return;
+    if (action === 'cancel') closeColumnFilterMenu(true);
+    else if (action === 'more') { columnMenu.limit += 100; renderColumnMenuValues(); }
+    else if (action === 'invert') { for (const o of columnMenuMatches()) columnMenu.selected.has(o.value) ? columnMenu.selected.delete(o.value) : columnMenu.selected.add(o.value); renderColumnMenuValues(); }
+    else commitColumnMenu(action);
+  });
+  document.addEventListener('input', e => {
+    if (!columnMenu || !e.target.matches('[data-column-search]') || e.isComposing) return;
+    columnMenu.query = e.target.value; columnMenu.limit = 100; renderColumnMenuValues();
+  });
+  document.addEventListener('compositionend', e => {
+    if (columnMenu && e.target.matches('[data-column-search]')) { columnMenu.query = e.target.value; columnMenu.limit = 100; renderColumnMenuValues(); }
+  });
+  document.addEventListener('change', e => {
+    if (!columnMenu) return;
+    if (e.target.matches('[data-column-select-all]')) {
+      for (const o of columnMenuMatches()) e.target.checked ? columnMenu.selected.add(o.value) : columnMenu.selected.delete(o.value);
+      renderColumnMenuValues();
+    } else if (e.target.matches('[data-column-index]')) {
+      const o = columnMenu.options[Number(e.target.dataset.columnIndex)]; if (!o) return;
+      e.target.checked ? columnMenu.selected.add(o.value) : columnMenu.selected.delete(o.value); updateColumnMenuSelection();
+    }
+  });
+  document.addEventListener('keydown', e => {
+    if (!columnMenu) return;
+    if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); closeColumnFilterMenu(true); }
+    else if (e.key === 'Enter' && e.target.matches('[data-column-search]') && !e.isComposing) { e.preventDefault(); commitColumnMenu('apply'); }
+  }, true);
+  window.addEventListener('resize', () => closeColumnFilterMenu(), { passive: true });
+  document.addEventListener('scroll', e => { if (columnMenu && !columnMenu.element.contains(e.target)) closeColumnFilterMenu(); }, { capture: true, passive: true });
 }
 
 /* ============ MDM 高级查询工作台 · 事件层与初始化 ============ */
@@ -9725,6 +9990,7 @@ function onClick(e) {
     case "sort": {
       if (state.sort.key === v) state.sort.dir = -state.sort.dir;
       else state.sort = { key: v, dir: 1 };
+      state.sort.explicit = true;
       state.page = 1; saveStateDebounced(); refreshAll();
       break;
     }
@@ -9735,6 +10001,16 @@ function onClick(e) {
       }
       break;
     }
+    case "tools-open":
+      closeQueryOptions();
+      closeColumnFilterMenu();
+      switchWorkspaceTab(state.lastToolTab || "focus");
+      document.querySelector('#toolsNav button.on')?.focus({ preventScroll: true });
+      break;
+    case "tools-close":
+      switchWorkspaceTab("results");
+      document.getElementById("toolsEntry")?.focus({ preventScroll: true });
+      break;
     case "tab": switchWorkspaceTab(v); break;
     case "open-source-modal": openSourceModal(); break;
     case "vconf-inspect": {
@@ -9979,10 +10255,11 @@ function onClick(e) {
       toast(state.filters.onlyPdfRule ? "已筛选工艺属性规则 " + no + (rule ? "（" + rule.title + "）" : "") + " 命中的物料" + colNote : "已取消规则筛选");
       break;
     }
+    case "column-filter-clear": delete state.filters.columnFilters[v]; refreshFilteredViews(); break;
     case "clear-field-issue": state.filters.onlyFieldIssue = ""; refreshFilteredViews(); break;
     case "clear-filters":
       clearTimeout(customFilterTimer);
-      state.filters = { mfg: new Set(), formula: new Set(), cats: new Set(), stocks: new Set(), brands: new Set(), status: "有效", pre: "", scope: "", onlyBlock: false, onlyIssue: false, onlyVconf: false, onlyBasket: false, onlyFieldIssue: "", onlyPdf: false, onlyPdfRule: "", customLogic: "AND", customConditions: [] };
+      state.filters = defaultQueryFilters();
       state.q = ""; state.tokens = []; state.qField = "all"; state.qMode = "smart";
       document.getElementById("qInput").value = "";
       resizeSearchInput(document.getElementById("qInput"));
@@ -10963,6 +11240,12 @@ async function init() {
   bindDpConfigSorting();
   bindCustomDatePickers();
   bindCustomFieldPickers();
+  bindColumnFilters();
+  document.getElementById("toolsWorkspace").addEventListener("keydown", e => {
+    if (e.key === "Escape" && !e.defaultPrevented && !e.target.matches("input, textarea, select") && !document.querySelector('.drawer.open, .page-overlay.open, #modal-mask.open, .pr-mask')) {
+      e.preventDefault(); switchWorkspaceTab("results"); document.getElementById("toolsEntry").focus({ preventScroll: true });
+    }
+  });
   bindTableDragAndScrollGuard();
   /* 详情路径 .html/编码 为统一格式；旧 query/hash 入口在加载时替换为该路径。 */
   let deepLinkMiss = null;

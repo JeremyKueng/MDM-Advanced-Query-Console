@@ -27,6 +27,14 @@ def validate_conditions(items, depth=0, budget=None):
             raise ValueError("条件配置格式不正确")
 
 
+def validate_column_filters(filters):
+    if not isinstance(filters, dict) or len(filters) > 256:
+        raise ValueError("表头筛选格式不正确")
+    for key, values in filters.items():
+        if not isinstance(key, str) or not key or key in ("__proto__", "constructor", "prototype") or not isinstance(values, list) or len(values) > 20000 or any(not isinstance(v, str) for v in values):
+            raise ValueError("表头筛选值必须为文本列表")
+
+
 def config_directory():
     override = os.environ.get("MDM_WORKBENCH_CONFIG_DIR")
     if override:
@@ -41,7 +49,7 @@ def validate_document(value):
     if value.get("schemaVersion") != 1:
         raise ValueError("配置文件版本不支持，请保留原文件并使用匹配版本的工作台")
     settings = value.get("settings")
-    if not isinstance(settings, dict) or type(settings.get("v")) is not int or not 1 <= settings["v"] <= 7:
+    if not isinstance(settings, dict) or type(settings.get("v")) is not int or not 1 <= settings["v"] <= 8:
         raise ValueError("个人配置内容或版本不支持")
 
     def string_list(obj, key):
@@ -57,6 +65,10 @@ def validate_document(value):
             raise ValueError("配置中的筛选条件必须为对象")
         for key in ("mfg", "formula", "cats", "stocks", "brands"):
             string_list(settings["filters"], key)
+    if isinstance(settings.get("filters"), dict) and "columnFilters" in settings["filters"]:
+        validate_column_filters(settings["filters"]["columnFilters"])
+    if isinstance(settings.get("sort"), dict) and "explicit" in settings["sort"] and type(settings["sort"]["explicit"]) is not bool:
+        raise ValueError("排序配置格式不正确")
     for key in ("savedViews", "dpTemplates"):
         if key in settings and (not isinstance(settings[key], list) or any(not isinstance(x, dict) for x in settings[key])):
             raise ValueError("配置中的 %s 必须为对象列表" % key)
@@ -101,6 +113,10 @@ def validate_document(value):
         for key in ("onlyBlock", "onlyIssue", "onlyVconf", "onlyBasket", "onlyPdf"):
             if type(filters.get(key)) is not bool:
                 raise ValueError("我的查询质量筛选无效")
+        if "columnFilters" in filters:
+            validate_column_filters(filters["columnFilters"])
+        if "explicit" in sort and type(sort["explicit"]) is not bool:
+            raise ValueError("排序配置格式不正确")
         conditions = filters.get("customConditions")
         if filters.get("customLogic") not in ("AND", "OR"):
             raise ValueError("我的查询自定义条件无效")
@@ -186,6 +202,12 @@ class ConfigStore:
             for key in ("processRules", "quickDetailView"):
                 if previous and key not in document["settings"] and key in previous["settings"]:
                     document = {**document, "settings": {**document["settings"], key: previous["settings"][key]}}
+            # 旧版本没有表头筛选字段，不能覆盖新版已保存的筛选；新版传入 {} 才表示清空。
+            old_filters = previous["settings"].get("filters", {}) if previous else {}
+            new_filters = document["settings"].get("filters", {})
+            if "columnFilters" in old_filters and "columnFilters" not in new_filters:
+                settings = {**document["settings"], "v": 8, "filters": {**new_filters, "columnFilters": old_filters["columnFilters"]}}
+                document = {**document, "settings": settings}
             validate_document(document)
             raw = json.dumps(document, ensure_ascii=False, indent=2, allow_nan=False).encode("utf-8")
             if len(raw) > MAX_BYTES:

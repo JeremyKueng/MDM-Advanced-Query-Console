@@ -39,6 +39,7 @@ const ICONS = {
   ban: '<circle cx="12" cy="12" r="9"/><line x1="5.6" y1="5.6" x2="18.4" y2="18.4"/>',
   grid: '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',
   grip: '<circle cx="9" cy="5" r="1.4" fill="currentColor" stroke="none"/><circle cx="9" cy="9" r="1.4" fill="currentColor" stroke="none"/><circle cx="9" cy="13" r="1.4" fill="currentColor" stroke="none"/><circle cx="9" cy="17" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="5" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="9" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="13" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="17" r="1.4" fill="currentColor" stroke="none"/>',
+  "chevron-down": '<polyline points="6 9 12 15 18 9"/>',
   "chevron-left": '<polyline points="15 18 9 12 15 6"/>',
   "chevron-right": '<polyline points="9 18 15 12 9 6"/>',
   swap: '<path d="M7 4v13M3 13l4 4 4-4"/><path d="M17 20V7M13 11l4-4 4 4"/>',
@@ -141,7 +142,7 @@ const state = {
     status: "有效", pre: "", scope: "",
     onlyBlock: false, onlyIssue: false, onlyVconf: false, onlyBasket: false,
     onlyFieldIssue: "", onlyPdf: false, onlyPdfRule: "",
-    customLogic: "AND", customConditions: [],
+    customLogic: "AND", customConditions: [], columnFilters: {},
   },
   filterCollapsed: true,     // 日常查询先显示常用筛选，完整分类按需展开
   expandedMore: new Set(),   // 已展开“更多N个”的筛选行 key（展开后隐藏“更多N个”胶囊）
@@ -838,9 +839,43 @@ function exactMatchRank(r, qSpec) {
 }
 
 /* ---------- 计算层 ---------- */
+/* 表头按单元格显示值分组；空白单独保留，多列之间取交集。 */
+function columnValueKey(value) { return fmt(value).trim(); }
+function validateColumnFilters(filters) {
+  if (filters === undefined) return;
+  if (!filters || typeof filters !== "object" || Array.isArray(filters) || Object.keys(filters).length > 256) throw new Error("表头筛选格式不正确");
+  for (const [key, values] of Object.entries(filters)) {
+    if (!key || ["__proto__", "constructor", "prototype"].includes(key) || !Array.isArray(values) || values.length > 20000 || values.some(v => typeof v !== "string")) throw new Error("表头筛选值必须为文本列表");
+  }
+}
+function normalizeColumnFilters(filters) {
+  const out = {};
+  for (const [key, values] of Object.entries(filters || {})) {
+    if (schemaByKey.has(key) && !MDM_HIDDEN_KEYS.has(key) && Array.isArray(values)) out[key] = [...new Set(values.filter(v => typeof v === "string"))];
+  }
+  return out;
+}
+const COLUMN_COLLATOR = new Intl.Collator("zh-Hans-CN", { numeric: true });
+function compareColumnValues(a, b, type, dir = 1) {
+  const va = columnValueKey(a), vb = columnValueKey(b);
+  if (!va || !vb) return !va && !vb ? 0 : !va ? 1 : -1;
+  if (type === "number" && Number.isFinite(Number(a)) && Number.isFinite(Number(b))) return (Number(a) - Number(b)) * dir;
+  if (type === "date") return (va < vb ? -1 : va > vb ? 1 : 0) * dir;
+  return COLUMN_COLLATOR.compare(va, vb) * dir;
+}
+function columnFilterOptions(key) {
+  const counts = new Map();
+  for (const r of rowsInScope(["column:" + key])) {
+    const value = columnValueKey(r[key]); counts.set(value, (counts.get(value) || 0) + 1);
+  }
+  for (const value of state.filters.columnFilters?.[key] || []) if (!counts.has(value)) counts.set(value, 0);
+  const type = schemaByKey.get(key)?.type || "text";
+  return [...counts].map(([value, count]) => ({ value, count })).sort((a, b) => compareColumnValues(a.value, b.value, type));
+}
 const NO_SKIP = new Set();
 function passFilters(r, skip) {
   const f = state.filters;
+  for (const [key, selected] of state._columnTests || []) if (!skip.has("column:" + key) && !selected.has(columnValueKey(r[key]))) return false;
   if (!skip.has("custom") && state._customMatches && !state._customMatches.has(r.material)) return false;
   const cutoff = (DATASET.meta && DATASET.meta.createdCutoff) || "0000-00-00";
   if (!skip.has("status") && f.status && r.status !== f.status) return false;
@@ -959,6 +994,7 @@ function computeDerived() {
   state._qSpec = parseQuerySpec(state.q, state.qMode, state.qField);
   state.tokens = state._qSpec.tokens || [];
   prepareCustomFilterMatches();
+  state._columnTests = Object.entries(normalizeColumnFilters(state.filters.columnFilters)).map(([key, values]) => [key, new Set(values)]);
   const out = [];
   for (const r of rows) if (passFilters(r, NO_SKIP)) out.push(r);
   const key = state.sort.key, dir = state.sort.dir;
@@ -966,19 +1002,12 @@ function computeDerived() {
   const hasQ = !state._qSpec.empty;
   out.sort((a, b) => {
     /* 若有搜索词且在默认排序下，自动把完全精准匹配的行排在最前，解决“全局模糊搜出一堆、精准命中的反而被淹没”的痛点 */
-    if (hasQ) {
+    if (hasQ && !state.sort.explicit) {
       const ra = exactMatchRank(a, state._qSpec);
       const rb = exactMatchRank(b, state._qSpec);
       if (ra !== rb) return rb - ra;
     }
-    const va = a[key], vb = b[key];
-    const na = va === null || va === undefined || va === "", nb = vb === null || vb === undefined || vb === "";
-    if (na && nb) return 0;
-    if (na) return 1;
-    if (nb) return -1;
-    if (type === "number") return (va - vb) * dir;
-    if (type === "date") return (va < vb ? -1 : va > vb ? 1 : 0) * dir;
-    return String(va).localeCompare(String(vb), "zh-Hans-CN") * dir;
+    return compareColumnValues(a[key], b[key], type, dir);
   });
   const pages = Math.max(1, Math.ceil(out.length / state.pageSize));
   if (state.page > pages) state.page = pages;

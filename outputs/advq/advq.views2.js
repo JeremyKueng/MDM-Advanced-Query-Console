@@ -2403,6 +2403,7 @@ function preserveWorkspaceViewport(render) {
 }
 let workspaceRevision = 0;
 const workspacePanelCache = new Map();
+const workspaceToolScroll = new Map();
 function workspacePanelKey(tab) {
   const local = {focus:state.focusFilter,vconf:state.vconfFilter,process:state.processCheckFilter,mps:state.mpsFilter,analyze:[state.analyzeField,state.analyzeFilter]};
   return workspaceRevision + ':' + JSON.stringify(local[tab] || null);
@@ -2422,9 +2423,13 @@ function renderWorkspacePanel(force = false) {
 function switchWorkspaceTab(tab) {
   if (!['results','focus','vconf','analyze','rules','process','mps'].includes(tab) || tab === state.tab) return;
   preserveWorkspaceViewport(() => {
+    const content = typeof document.getElementById === 'function' ? document.getElementById('toolsContent') : null;
+    if (content && state.tab !== 'results') workspaceToolScroll.set(state.tab, content.scrollTop);
     state.tab = tab;
+    if (typeof closeColumnFilterMenu === "function") closeColumnFilterMenu();
     renderTabs();
     renderWorkspacePanel();
+    if (content && tab !== 'results') content.scrollTop = workspaceToolScroll.get(tab) || 0;
     if (typeof syncTableXnav === 'function') {
       const tables = {results:'mainTableWrap',process:'processCheckTableWrap',mps:'mpsTableWrap',focus:'focusTableWrap',vconf:'vconfTableWrap'};
       if (tables[tab]) syncTableXnav(tables[tab]);

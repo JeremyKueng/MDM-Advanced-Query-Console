@@ -56,6 +56,8 @@ function renderStaticButtons() {
   document.querySelector('#detailPage .back').innerHTML = ic("chevron-left", 14) + " 返回工作台";
   var cfgBack = document.querySelector('#dpConfigModal .back');
   if (cfgBack) cfgBack.innerHTML = ic("chevron-left", 14) + " 返回单品看板";
+  const toolsEntry = document.getElementById("toolsEntry");
+  if (toolsEntry) toolsEntry.innerHTML = ic("grid", 14) + " 工具与分析 " + ic("chevron-right", 13);
   var tabDefs = [
     ["results", "table", "查询结果", "tabCntResults"],
     ["focus", "star", "重点关注", "tabCntFocus"],
@@ -65,7 +67,7 @@ function renderStaticButtons() {
     ["rules", "file-text", "口径与规则", ""],
     ["mps", "route", 'MPS 工艺路线 <span class="special-label">专项</span>', "tabCntMps"],
   ];
-  Array.prototype.forEach.call(document.querySelectorAll('#tabBar button[data-act="tab"]'), function (b) {
+  Array.prototype.forEach.call(document.querySelectorAll('#tabBar button[data-act="tab"], #toolsNav button[data-act="tab"]'), function (b) {
     var v = b.getAttribute("data-v");
     for (var i = 0; i < tabDefs.length; i++) {
       if (tabDefs[i][0] === v) {
@@ -115,10 +117,15 @@ function renderTabs() {
     var mpsRows = (derived.filtered || []).filter(function (r) { return r.route && (r.routeStatus !== "完整" || routeIssueMap.has(r.material)); });
     cntM.textContent = mpsRows.length.toLocaleString() + " 待关注";
   }
-  Array.prototype.forEach.call(document.querySelectorAll('#tabBar button[data-act="tab"]'), function (b) {
+  Array.prototype.forEach.call(document.querySelectorAll('#tabBar button[data-act="tab"], #toolsNav button[data-act="tab"]'), function (b) {
     b.classList.toggle("on", b.getAttribute("data-v") === state.tab);
     b.setAttribute("aria-pressed", b.getAttribute("data-v") === state.tab ? "true" : "false");
   });
+  const toolOpen = state.tab !== "results";
+  if (toolOpen) state.lastToolTab = state.tab;
+  const workspace = document.getElementById("toolsWorkspace"), entry = document.getElementById("toolsEntry");
+  if (workspace) workspace.hidden = !toolOpen;
+  if (entry) { entry.classList.toggle("on", toolOpen); entry.setAttribute("aria-expanded", String(toolOpen)); }
   Array.prototype.forEach.call(document.querySelectorAll(".tabpanel"), function (p) {
     p.classList.toggle("on", p.id === "panel-" + state.tab);
   });
@@ -564,6 +571,10 @@ function buildActiveFilterLinkageTags(sizeCls, includeSearch = true, includeStat
   if (f.onlyBasket) tags.push(chip(true, "仅看对比篮 ✕", "toggle-only", 'data-v="onlyBasket"', cls));
   if (f.onlyPdfRule) tags.push(chip(true, "规则" + esc(f.onlyPdfRule) + " ✕", "pdf-rule-filter", 'data-v="' + esc(f.onlyPdfRule) + '"', cls + " warn"));
   if (f.onlyFieldIssue) tags.push(chip(true, "字段异常:" + esc(f.onlyFieldIssue) + " ✕", "clear-field-issue", "", cls + " warn"));
+  for (const [key, values] of Object.entries(f.columnFilters || {})) {
+    const label = schemaByKey.get(key)?.label || key;
+    tags.push(chip(true, "列·" + esc(label) + ":" + esc(values.length === 1 ? values[0] || '(空白)' : values.length + ' 项') + " ✕", "column-filter-clear", 'data-v="' + esc(key) + '" title="' + esc(values.join('；')) + '"', cls));
+  }
   const customCount = activeCustomConditions().length;
   if (customCount) {
     tags.push('<span class="custom-filter-relation">自定义·' + (f.customLogic === "OR" ? "任一满足" : "全部满足") + '：</span>');
@@ -582,7 +593,7 @@ function renderScopeLinkageBar(panelTitle, extraRightHtml) {
   const totalScoped = (derived && derived.total) || 0;
   const totalAll = (STATS && STATS.total) || rows.length;
   const f = state.filters;
-  const hasNonDefault = f.mfg.size || f.formula.size || f.cats.size || f.stocks.size || f.brands.size || f.status !== "有效" || f.pre || f.scope || f.onlyBlock || f.onlyIssue || f.onlyVconf || f.onlyBasket || f.onlyFieldIssue || f.onlyPdf || f.onlyPdfRule || activeCustomConditions().length || state.q;
+  const hasNonDefault = f.mfg.size || f.formula.size || f.cats.size || f.stocks.size || f.brands.size || f.status !== "有效" || f.pre || f.scope || f.onlyBlock || f.onlyIssue || f.onlyVconf || f.onlyBasket || f.onlyFieldIssue || f.onlyPdf || f.onlyPdfRule || activeCustomConditions().length || Object.keys(f.columnFilters || {}).length || state.q;
   return '<div class="scope-linkage-bar" data-scope-total="' + totalScoped + '" style="grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;background:#f4f9ff;border:1px solid #bfd8fa;border-radius:9px;padding:7px 12px;margin-bottom:10px;font-size:12px">'
     + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
     + '<span style="font-weight:750;color:var(--blue-deep)">🔗 已与上方筛选区实时联动（' + esc(panelTitle || "当前视图") + '基数：<b>' + totalScoped.toLocaleString() + '</b> / ' + totalAll.toLocaleString() + ' 条）：</span>'
@@ -667,7 +678,7 @@ function renderFilters() {
   /* 汇总当前已激活的筛选条件标签（供顶部紧凑折叠条与下方各展示面板实时联动显示） */
   const activeSummaryTags = buildActiveFilterLinkageTags("sm", false, false);
 
-  const anyFilter = f.mfg.size || f.formula.size || f.cats.size || f.stocks.size || f.brands.size || f.status !== "有效" || f.pre || f.scope || f.onlyBlock || f.onlyIssue || f.onlyVconf || f.onlyBasket || f.onlyFieldIssue || f.onlyPdf || f.onlyPdfRule || (f.customConditions || []).length || state.q;
+  const anyFilter = f.mfg.size || f.formula.size || f.cats.size || f.stocks.size || f.brands.size || f.status !== "有效" || f.pre || f.scope || f.onlyBlock || f.onlyIssue || f.onlyVconf || f.onlyBasket || f.onlyFieldIssue || f.onlyPdf || f.onlyPdfRule || (f.customConditions || []).length || Object.keys(f.columnFilters || {}).length || state.q;
   const collapsed = !!state.filterCollapsed;
 
   const quickOptions = (key, label, act) => '<select data-act="quick-filter" data-key="' + act + '" aria-label="按' + label + '筛选"><option value="">' + label + ' · 添加筛选</option>'
@@ -744,7 +755,7 @@ function renderResultLine() {
   const report = querySearchReport(), batch = report.batch;
   const source = '<span class="source-time" title="数据源：' + esc(DATASET.meta.source || '') + '">数据时间 ' + esc(DATASET.meta.sourceStamp || '未提供') + '</span>';
   let h = '<div class="result-feedback"><span>' + (state.q ? '搜索“' + esc(state.q.length > 45 ? state.q.slice(0, 45) + '…' : state.q).replace(/\n/g, ' · ') + '”' : '勾选物料可对比，点击编码或说明可速览') + '</span>'
-    + (state.q && !batch ? '<span>· ' + derived.total.toLocaleString() + ' 条匹配' + (state.qMode === 'smart' ? '，精准命中优先' : '') + '</span>' : '') + source + '</div>';
+    + (state.q && !batch ? '<span>· ' + derived.total.toLocaleString() + ' 条匹配' + (state.sort.explicit ? '，按' + esc(schemaByKey.get(state.sort.key)?.label || state.sort.key) + (state.sort.dir === 1 ? '升序' : '降序') : state.qMode === 'smart' ? '，精准命中优先' : '') + '</span>' : '') + source + '</div>';
   if (batch) {
     const detail = (label, codes, action) => !codes.length ? '' : '<div><b>' + label + ' ' + codes.length + ' 个</b> ' + (action ? '<button class="tool-btn" data-act="copy-query-codes" data-v="' + action + '">复制编码</button>' : '') + '<div class="batch-code-list">' + codes.map(esc).join('、') + '</div></div>';
     h += '<details class="batch-feedback"><summary>批量查码 <b>' + batch.total + '</b> 个 · 当前找到 <b>' + batch.found.length + '</b> 个 · 未找到 <b>' + batch.missing.length + '</b> 个 · 被筛选排除 <b>' + batch.excluded.length + '</b> 个 · 一码多料 <b>' + batch.ambiguous.length + '</b> 个'
@@ -948,6 +959,7 @@ function tableXnavHtml(tableId, colCount) {
     + '</div></div>';
 }
 function renderResults() {
+  if (typeof closeColumnFilterMenu === "function") closeColumnFilterMenu();
   renderViewShortcuts();
   renderQueryWorkspace();
   const body = document.getElementById("resultsBody");
@@ -974,8 +986,11 @@ function renderResults() {
     const on = state.sort.key === k;
     const stCls = (i < 4 ? " sticky-col sc-" + i : "") + (resultColumnClass(k) ? " " + resultColumnClass(k) : "") + (fieldLocator.key === k ? " field-located" : "");
     const pinBadge = i < 4 ? '<span style="font-size:10px;color:var(--blue);margin-left:2px" title="固定冻结列">📌</span>' : "";
-    h += '<th class="sortable' + stCls + '" data-field="' + esc(k) + '" data-act="sort" data-v="' + esc(k) + '" title="' + esc(s.group) + " · " + esc(s.type) + (i < 4 ? "（核心冻结列，左右滑动固定）" : "") + '">' + esc(s.label) + pinBadge
-      + (on ? '<span class="arrow">' + (state.sort.dir === 1 ? "▲" : "▼") + "</span>" : "") + "</th>";
+    const filtered = Object.prototype.hasOwnProperty.call(state.filters.columnFilters || {}, k);
+    h += '<th class="column-header' + stCls + (filtered ? ' column-filtered' : '') + '" data-field="' + esc(k) + '" aria-sort="' + (on ? state.sort.dir === 1 ? 'ascending' : 'descending' : 'none') + '"><div class="column-heading">'
+      + '<button type="button" class="column-label" data-column-action="open" data-field="' + esc(k) + '" aria-label="筛选和排序：' + esc(s.label) + '" aria-haspopup="dialog" aria-expanded="false">' + esc(s.label) + pinBadge
+      + (on ? '<span class="arrow">' + (state.sort.dir === 1 ? '▲' : '▼') + '</span>' : '') + '</button>'
+      + '<button type="button" class="column-dropdown" data-column-action="open" data-field="' + esc(k) + '" aria-label="' + esc(s.label) + (filtered ? '，已筛选' : '') + '筛选菜单" aria-haspopup="dialog" aria-expanded="false">' + ic(filtered ? 'filter' : 'chevron-down', 13) + '</button></div></th>';
   }
   h += '<th class="sticky-right" title="右侧固定冻结操作列">操作 📌</th></tr></thead><tbody>';
   for (const r of derived.pageRows) {

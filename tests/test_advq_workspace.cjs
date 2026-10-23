@@ -17,5 +17,9 @@ refreshAll();assert.equal(counts.computeDerived,2);assert.equal(counts.renderMps
 switchWorkspaceTab('results');assert.equal(counts.renderResults,2,'hidden panels invalidate when global data changes');
 for(const tab of ['focus','vconf','analyze','rules','process','mps','results'])switchWorkspaceTab(tab);
 assert.equal(counts.computeDerived,2);assert.equal(window.scrollY,400);
+const toolContent={scrollTop:0};document.getElementById=id=>id==='toolsContent'?toolContent:null;
+switchWorkspaceTab('mps');toolContent.scrollTop=155;switchWorkspaceTab('focus');assert.equal(toolContent.scrollTop,0,'a newly opened tool starts at the top');
+toolContent.scrollTop=77;switchWorkspaceTab('mps');assert.equal(toolContent.scrollTop,155,'tool scroll positions remain independent');
+switchWorkspaceTab('results');switchWorkspaceTab('focus');assert.equal(toolContent.scrollTop,77,'closing tools preserves their scroll state');
 console.log('PASS: panel switches skip global recomputation and hidden tables, preserve filter DOM and scroll, reuse cached panels, and invalidate after filter changes.');
 `,context);

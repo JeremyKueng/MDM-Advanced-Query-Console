@@ -1407,6 +1407,7 @@ function onClick(e) {
     case "sort": {
       if (state.sort.key === v) state.sort.dir = -state.sort.dir;
       else state.sort = { key: v, dir: 1 };
+      state.sort.explicit = true;
       state.page = 1; saveStateDebounced(); refreshAll();
       break;
     }
@@ -1417,6 +1418,16 @@ function onClick(e) {
       }
       break;
     }
+    case "tools-open":
+      closeQueryOptions();
+      closeColumnFilterMenu();
+      switchWorkspaceTab(state.lastToolTab || "focus");
+      document.querySelector('#toolsNav button.on')?.focus({ preventScroll: true });
+      break;
+    case "tools-close":
+      switchWorkspaceTab("results");
+      document.getElementById("toolsEntry")?.focus({ preventScroll: true });
+      break;
     case "tab": switchWorkspaceTab(v); break;
     case "open-source-modal": openSourceModal(); break;
     case "vconf-inspect": {
@@ -1661,10 +1672,11 @@ function onClick(e) {
       toast(state.filters.onlyPdfRule ? "已筛选工艺属性规则 " + no + (rule ? "（" + rule.title + "）" : "") + " 命中的物料" + colNote : "已取消规则筛选");
       break;
     }
+    case "column-filter-clear": delete state.filters.columnFilters[v]; refreshFilteredViews(); break;
     case "clear-field-issue": state.filters.onlyFieldIssue = ""; refreshFilteredViews(); break;
     case "clear-filters":
       clearTimeout(customFilterTimer);
-      state.filters = { mfg: new Set(), formula: new Set(), cats: new Set(), stocks: new Set(), brands: new Set(), status: "有效", pre: "", scope: "", onlyBlock: false, onlyIssue: false, onlyVconf: false, onlyBasket: false, onlyFieldIssue: "", onlyPdf: false, onlyPdfRule: "", customLogic: "AND", customConditions: [] };
+      state.filters = defaultQueryFilters();
       state.q = ""; state.tokens = []; state.qField = "all"; state.qMode = "smart";
       document.getElementById("qInput").value = "";
       resizeSearchInput(document.getElementById("qInput"));
@@ -2645,6 +2657,12 @@ async function init() {
   bindDpConfigSorting();
   bindCustomDatePickers();
   bindCustomFieldPickers();
+  bindColumnFilters();
+  document.getElementById("toolsWorkspace").addEventListener("keydown", e => {
+    if (e.key === "Escape" && !e.defaultPrevented && !e.target.matches("input, textarea, select") && !document.querySelector('.drawer.open, .page-overlay.open, #modal-mask.open, .pr-mask')) {
+      e.preventDefault(); switchWorkspaceTab("results"); document.getElementById("toolsEntry").focus({ preventScroll: true });
+    }
+  });
   bindTableDragAndScrollGuard();
   /* 详情路径 .html/编码 为统一格式；旧 query/hash 入口在加载时替换为该路径。 */
   let deepLinkMiss = null;

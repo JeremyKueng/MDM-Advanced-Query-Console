@@ -43,7 +43,7 @@ assert.equal(customFilterChildren('0.0').length,3);
 const draft=captureQueryContext();
 state.queryViews=[{id:'nested',name:'嵌套查询',context:draft}];
 const settings=captureUserSettings();
-assert.equal(settings.v,7);validateQueryViews(settings.queryViews);
+assert.equal(settings.v,8);validateQueryViews(settings.queryViews);
 applyUserSettings(decodeUserConfig(configDoc(settings)));
 same(state.filters.customConditions,settings.filters.customConditions);
 same(state.queryViews[0].context.filters.customConditions,draft.filters.customConditions);

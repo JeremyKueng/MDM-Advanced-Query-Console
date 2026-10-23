@@ -38,6 +38,26 @@ class ConfigStoreTests(unittest.TestCase):
                 self.store.save(bad)
             self.assertEqual(self.store.read()["config"], doc)
 
+    def test_column_filters_roundtrip_legacy_preservation_and_validation(self):
+        doc = document("表头筛选")
+        doc["settings"].update(v=8, filters={"columnFilters": {"brand": ["A", ""], "net": ["0", "1.2346"]}}, sort={"key": "net", "dir": -1, "explicit": True})
+        self.store.save(doc)
+        self.assertEqual(self.store.read()["config"], doc)
+        self.store.save(document("旧标签页"))
+        stored = self.store.read()["config"]
+        self.assertEqual(stored["settings"]["v"], 8)
+        self.assertEqual(stored["settings"]["filters"], doc["settings"]["filters"])
+        for bad_values in (None, [], {"brand": "A"}, {"brand": [1]}, {"constructor": ["x"]}):
+            bad = json.loads(json.dumps(doc))
+            bad["settings"]["filters"]["columnFilters"] = bad_values
+            with self.assertRaises(ValueError):
+                self.store.save(bad)
+            self.assertEqual(self.store.read()["config"], stored)
+        cleared = json.loads(json.dumps(doc))
+        cleared["settings"]["filters"]["columnFilters"] = {}
+        self.store.save(cleared)
+        self.assertEqual(self.store.read()["config"]["settings"]["filters"]["columnFilters"], {})
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)

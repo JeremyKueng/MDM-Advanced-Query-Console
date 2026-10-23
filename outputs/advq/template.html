@@ -1064,6 +1064,73 @@ body:has(.basket-dock:not([hidden])) #toast {bottom:78px;}
 .material-detail-link {color:var(--blue-deep);text-decoration:none;border-bottom:1px dashed #9ec5fa;}
 .material-detail-link:hover {color:var(--blue);border-color:var(--blue);}
 
+
+/* 表头筛选与排序 */
+.column-heading {display:flex;align-items:center;gap:3px;min-width:0;}
+.column-heading button {border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;padding:0;display:inline-flex;align-items:center;}
+.column-heading .column-label {min-width:0;flex:1;text-align:left;gap:3px;white-space:nowrap;}
+.column-heading .column-dropdown {flex:none;border-radius:4px;padding:4px;margin:-4px 0;opacity:.65;}
+.column-heading button:hover,.column-filtered {color:var(--blue)!important;}
+.column-heading .column-dropdown:hover,.column-filtered .column-dropdown {background:#e1edff;opacity:1;}
+.column-heading button:focus-visible {outline:2px solid var(--blue);outline-offset:3px;}
+.column-filter-menu {position:fixed;z-index:120;width:min(340px,calc(100vw - 24px));max-height:calc(100dvh - 24px);display:flex;flex-direction:column;background:#fff;border:1px solid #c7d7ec;border-radius:12px;box-shadow:0 10px 40px #102a4c33;font-size:13px;overflow:hidden;color:var(--ink);}
+.column-filter-menu button {font:inherit;cursor:pointer;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:6px;padding:7px 11px;}
+.column-filter-menu button:hover {background:var(--blue-soft);color:var(--blue);}
+.column-filter-menu button:disabled {opacity:.4;cursor:default;}
+.column-filter-menu header {display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);}
+.column-filter-menu header strong {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.column-filter-menu header button {border:0;padding:3px;display:flex;}
+.column-sort-actions {display:flex;gap:8px;padding:10px 12px 4px;}
+.column-sort-actions button {flex:1;white-space:nowrap;}
+.column-sort-actions [aria-pressed=true] {background:var(--blue-soft);color:var(--blue);border-color:#a5c9fc;}
+.column-filter-menu .column-clear {margin:5px 12px 9px;border:0;display:flex;align-items:center;gap:7px;text-align:left;}
+.column-filter-content {padding:0 12px 8px;overflow:auto;min-height:0;}
+.column-filter-content>input {width:100%;border:1px solid #bfd2eb;border-radius:7px;padding:9px 10px;font:inherit;}
+.column-selection {display:flex;align-items:center;justify-content:space-between;padding:9px 0;gap:8px;}
+.column-selection label,.column-option {display:flex;align-items:center;gap:8px;cursor:pointer;}
+.column-selection input,.column-option input {accent-color:var(--blue);width:15px;height:15px;flex:none;margin:0;}
+.column-selection button {border:0;padding:2px;color:var(--blue);}
+.column-values {max-height:245px;overflow:auto;border:1px solid var(--line);border-radius:7px;overscroll-behavior:contain;}
+.column-option {padding:7px 9px;min-height:33px;}
+.column-option:hover {background:var(--blue-soft);}
+.column-option>span {flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.column-option small {font-variant-numeric:tabular-nums;color:var(--muted);}
+.column-no-values {padding:20px;color:var(--muted);text-align:center;}
+.column-filter-menu .column-more {border:0;color:var(--blue);width:100%;}
+.column-filter-menu [data-column-summary] {font-size:12px;color:var(--muted);margin:9px 0 5px;}
+.column-filter-note {display:block;color:var(--subtle);font-size:11px;line-height:1.5;}
+.column-filter-menu footer {display:flex;justify-content:flex-end;gap:8px;border-top:1px solid var(--line);padding:10px 12px;flex:none;}
+.column-filter-menu footer .primary {background:var(--blue);color:#fff;border-color:var(--blue);}
+.column-filter-menu [hidden] {display:none;}
+
+
+/* 专业工具仅占用查询结果区域；上方搜索与筛选始终可操作。 */
+#tabBar {align-items:center;justify-content:space-between;overflow:visible;flex-wrap:nowrap;}
+#tabBar .tools-entry {margin-left:auto;border:1px solid var(--line);color:var(--blue-deep);background:#fff;}
+#tabBar .tools-entry.on {border-color:var(--blue);background:var(--blue-soft);color:var(--blue);}
+.workspace-stage {position:relative;min-width:0;}
+.tools-workspace {height:clamp(560px,calc(100dvh - 145px),860px);display:flex;flex-direction:column;overflow:hidden;background:#fff;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);}
+.tools-workspace[hidden] {display:none;}
+.tools-workspace-header {display:flex;align-items:center;gap:14px;padding:13px 16px;border-bottom:1px solid var(--line);background:#fff;flex:none;}
+.tools-workspace-header strong {font-size:15px;color:var(--blue-deep);}
+.tools-workspace-header>span {font-size:12px;color:var(--muted);}
+.tools-workspace-header>button {margin-left:auto;}
+.tools-workspace-body {display:flex;flex:1;min-height:0;}
+.tools-nav {width:210px;flex:none;overflow-y:auto;background:#f7fafd;border-right:1px solid var(--line);padding:14px 10px;}
+.tools-nav p {font-size:11px;font-weight:650;letter-spacing:.5px;color:var(--subtle);margin:0 8px 9px;}
+.tools-nav p.tools-special-heading {border-top:1px solid var(--line);margin-top:15px;padding-top:16px;}
+.tools-nav>button {display:flex;align-items:center;gap:7px;width:100%;min-height:43px;border:0;border-radius:7px;padding:9px 8px;background:transparent;color:var(--muted);font-size:12px;font-weight:600;text-align:left;white-space:nowrap;}
+.tools-nav>button:hover {color:var(--blue);background:var(--blue-soft);}
+.tools-nav>button.on {color:var(--blue);background:#e5efff;}
+.tools-nav .cnt {margin-left:auto;font-size:10px;line-height:1.5;font-variant-numeric:tabular-nums;color:var(--muted);background:#eaf0f6;border-radius:6px;padding:1px 5px;}
+.tools-nav .special-label {display:none;}
+.tools-content {min-width:0;flex:1;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;}
+.tools-content>.sec {border:0;border-radius:0;box-shadow:none;margin:0;}
+.tools-content>.sec>.sec-head {position:sticky;top:0;z-index:18;background:#fff;flex-wrap:wrap;gap:8px;}
+.tools-content>.sec>.sec-head .sub {flex:1;min-width:180px;}
+@media(max-width:1000px) {.tools-nav{width:182px;padding:12px 6px;}.tools-nav>button{flex-wrap:wrap;gap:5px;}.tools-nav .cnt{font-size:10px;}.tools-content .sec-body{padding:12px;}}
+@media(max-width:650px) {.tools-workspace-header{gap:8px;padding:10px;}.tools-workspace-header>span{display:none;}.tools-workspace-body{flex-direction:column;}.tools-nav{width:auto;display:flex;overflow-x:auto;overflow-y:hidden;border-right:0;border-bottom:1px solid var(--line);padding:6px;gap:5px;}.tools-nav p{display:none;}.tools-nav>button{width:auto;flex:none;white-space:nowrap;min-height:34px;}.tools-nav .cnt{display:none;}.tools-nav>button[data-v=mps]{border-left:1px solid var(--line);border-radius:0;}.tools-content{min-height:0;}#tabBar .tools-entry{padding:8px;}}
+
 </style>
 </head>
 <body>
@@ -1103,21 +1170,12 @@ body:has(.basket-dock:not([hidden])) #toast {bottom:78px;}
     </div>
   </section>
 
-  <!-- 功能区标签页 -->
-  <nav class="tabbar" id="tabBar" aria-label="工作台功能">
-    <div class="tabbar-main" role="group" aria-label="MDM 主数据治理">
-      <button data-act="tab" data-v="results"></button>
-      <button data-act="tab" data-v="focus"></button>
-      <button data-act="tab" data-v="vconf"></button>
-      <button data-act="tab" data-v="process"></button>
-      <button data-act="tab" data-v="analyze"></button>
-      <button data-act="tab" data-v="rules"></button>
-    </div>
-    <div class="tabbar-special" role="group" aria-label="MPS 专项校验">
-      <button data-act="tab" data-v="mps" title="MPS 工艺路线专项校验"></button>
-    </div>
+  <!-- 日常查询只保留查询结果，专业看板统一收进下一层。 -->
+  <nav class="tabbar" id="tabBar" aria-label="查询与工具">
+    <button data-act="tab" data-v="results" aria-controls="panel-results"></button>
+    <button class="tools-entry" id="toolsEntry" data-act="tools-open" aria-expanded="false" aria-controls="toolsWorkspace"></button>
   </nav>
-
+  <div class="workspace-stage">
   <!-- 面板：查询结果 -->
   <section class="sec tabpanel on" id="panel-results">
     <div class="sec-head">
@@ -1133,6 +1191,20 @@ body:has(.basket-dock:not([hidden])) #toast {bottom:78px;}
     <div class="pager" id="pager"></div>
   </section>
 
+  <section class="tools-workspace" id="toolsWorkspace" aria-label="工具与分析" hidden>
+    <header class="tools-workspace-header"><strong>工具与分析</strong><span>共用上方搜索与筛选</span><button type="button" class="tool-btn" data-act="tools-close">返回查询结果 ✕</button></header>
+    <div class="tools-workspace-body">
+      <nav class="tools-nav" id="toolsNav" aria-label="工具分类">
+        <p>MDM 主数据治理</p>
+        <button data-act="tab" data-v="focus" aria-controls="panel-focus"></button>
+        <button data-act="tab" data-v="vconf" aria-controls="panel-vconf"></button>
+        <button data-act="tab" data-v="process" aria-controls="panel-process"></button>
+        <button data-act="tab" data-v="analyze" aria-controls="panel-analyze"></button>
+        <button data-act="tab" data-v="rules" aria-controls="panel-rules"></button>
+        <p class="tools-special-heading">MPS 专项</p>
+        <button data-act="tab" data-v="mps" aria-controls="panel-mps"></button>
+      </nav>
+      <div class="tools-content" id="toolsContent">
   <!-- 面板：重点关注（全宽具象化数据异常核查工作台） -->
   <section class="sec tabpanel" id="panel-focus">
     <div class="sec-head">
@@ -1205,6 +1277,10 @@ body:has(.basket-dock:not([hidden])) #toast {bottom:78px;}
     </div>
     <div class="sec-body" id="mpsBody"></div>
   </section>
+      </div>
+    </div>
+  </section>
+  </div>
 </main>
 
 <aside class="basket-dock" id="basketDock" aria-label="物料对比篮" hidden>

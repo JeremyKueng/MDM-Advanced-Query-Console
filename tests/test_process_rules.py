@@ -3,6 +3,7 @@ import contextlib
 import io
 import json
 import os
+import shutil
 from pathlib import Path
 import sys
 import tempfile
@@ -82,9 +83,13 @@ class ProcessRuleTests(unittest.TestCase):
         config['rules'].append({'id':'test-custom','no':12,'title':'源表更新保留规则测试','enabled':True,'scope':{'logic':'AND','conditions':[]},'checks':[{'id':'c1','enabled':True,'code':'PFC','message':'测试净重上限','when':{'field':'净重','op':'gt','value':5}}]})
         with tempfile.TemporaryDirectory() as temp:
             folder=Path(temp);out=folder/'outputs';out.mkdir()
+            # RPA 源表会持续更新；固定本次输入，用同一份源表核对行数和规则，不能与旧浏览器快照比较。
+            input_copy=folder/'source.xlsx';shutil.copyfile(source,input_copy)
+            headers, values=build.load_excel(input_copy)
+            raws=[build.normalize_raw_record({h:build.bms.clean(v) for h,v in zip(headers,row)}) for row in values]
             store=ConfigStore(folder/'config');store.save({'type':'mdm-workbench-config','schemaVersion':1,'settings':{'v':6,'processRules':config}})
             with patch.dict(os.environ,{'MDM_WORKBENCH_CONFIG_DIR':str(store.directory)}),patch.object(build,'OUT_DIR',out),contextlib.redirect_stdout(io.StringIO()):
-                rebuilt=build.main(['--source',str(source)])
+                rebuilt=build.main(['--source',str(input_copy)])
             self.assertEqual(len(rebuilt['rows']),len(raws))
             names=[s['key'] for s in rebuilt['schema']];flagidx=names.index('flags')
             self.assertEqual(sum('PFC:12:测试净重上限' in r[flagidx] for r in rebuilt['rows']),sum(pr.compile_node(config['scope'])(r) and (pr.number(r.get('净重')) or 0)>5 for r in raws))
