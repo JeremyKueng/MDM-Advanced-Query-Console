@@ -106,3 +106,5 @@ node tests/test_advq_source_modal.cjs
 - 在线更新用于安装了 Git、通过本地“启动工作台”运行的 GitHub 克隆版，仅支持此项目 `main` 分支。首次获得此功能仍需手动拉取新版并重启一次；之后直接使用页面按钮。若有其他未提交的代码修改、暂存修改或分叉提交，会保留它们并停止更新，避免覆盖手工工作。
 
 测试：`python3 -m unittest discover -s tests -p 'test_workbench_update.py'` 使用临时本机 Git 远端验证更新、旧版回滚、后台重启和配置/数据保留，不向外上传测试数据。
+
+开发目录与正式运行目录可分开：在原目录放置被 Git 忽略的 `workbench-runtime.local.json`，内容为 `{"version":1,"directory":"正式克隆目录的绝对路径"}`。启动器会验证目标是本项目 GitHub 的 `main` 副本，再交给正式版启动，自动沿用原入口的个人配置目录。迁移前须把当前 `outputs/advq/dataset.json`、`dataset.b64` 复制到正式副本并重建 HTML；保留原目录即可回滚。正常的 GitHub 克隆安装不需要此文件。

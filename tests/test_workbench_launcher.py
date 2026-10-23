@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import signal
+import shutil
 import socket
 import subprocess
 import sys
@@ -12,6 +13,7 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -21,6 +23,43 @@ spec.loader.exec_module(launcher)
 
 
 class LauncherTests(unittest.TestCase):
+    def test_release_link_preserves_existing_profile_and_arguments(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / 'development'
+            target = Path(directory) / 'release'
+            root.mkdir()
+            (target / 'scripts').mkdir(parents=True)
+            (target / 'scripts/launch_workbench.py').write_text('# release launcher')
+            (root / 'workbench-runtime.local.json').write_text(json.dumps({'version':1,'directory':str(target)}))
+            def git(_root, *args):
+                return {('rev-parse','--show-toplevel'):str(target),('remote','get-url','origin'):'https://github.com/JeremyKueng/MDM-Advanced-Query-Console.git',('branch','--show-current'):'main'}[args]
+            profile = Path(directory) / 'original-profile'
+            with patch('workbench_update.git',side_effect=git):
+                self.assertEqual(launcher.linked_runtime(root),target.resolve())
+            with patch.object(launcher,'config_directory',return_value=profile), patch.object(launcher.subprocess,'run') as run:
+                run.return_value.returncode = 0
+                self.assertEqual(launcher.launch_linked_runtime(target,['--port','4199','--no-browser']),0)
+                args,kwargs=run.call_args
+                self.assertEqual(args[0],[sys.executable,str(target/'scripts/launch_workbench.py'),'--port','4199','--no-browser'])
+                self.assertEqual(kwargs['env']['MDM_WORKBENCH_CONFIG_DIR'],str(profile.resolve()))
+
+    def test_release_link_rejects_untrusted_missing_or_recursive_targets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            self.assertIsNone(launcher.linked_runtime(root))
+            marker=root/'workbench-runtime.local.json'
+            marker.write_text(json.dumps({'version':1,'directory':str(root)}))
+            with self.assertRaisesRegex(RuntimeError,'循环'):launcher.linked_runtime(root)
+            marker.write_text(json.dumps({'version':1,'directory':'relative-path'}))
+            with self.assertRaisesRegex(RuntimeError,'格式'):launcher.linked_runtime(root)
+            target=root/'release';(target/'scripts').mkdir(parents=True)
+            (target/'scripts/launch_workbench.py').write_text('# release launcher')
+            marker.write_text(json.dumps({'version':1,'directory':str(target)}))
+            with patch('workbench_update.git',side_effect=[str(target),'https://github.com/other/untrusted.git']):
+                with self.assertRaisesRegex(RuntimeError,'GitHub'):launcher.linked_runtime(root)
+            (target/marker.name).write_text('{}')
+            with self.assertRaisesRegex(RuntimeError,'循环'):launcher.linked_runtime(root)
+
     def test_detached_service_survives_launcher_and_is_reused(self):
         with tempfile.TemporaryDirectory() as directory:
             with socket.socket() as probe:
@@ -45,6 +84,32 @@ class LauncherTests(unittest.TestCase):
                 deadline = time.monotonic() + 3
                 while launcher.health(port) and time.monotonic() < deadline:
                     time.sleep(0.05)
+
+    def test_original_entry_starts_official_copy_with_original_profile(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)/'development';target=Path(directory)/'release';profile=Path(directory)/'profile'
+            for folder in (root,target):
+                (folder/'scripts').mkdir(parents=True)
+                for name in ('launch_workbench.py','serve.py','workbench_update.py','source_settings.py','workbench_config.py'):
+                    shutil.copy2(ROOT/'scripts'/name,folder/'scripts'/name)
+            for args in (['init','-b','main'],['remote','add','origin','https://github.com/JeremyKueng/MDM-Advanced-Query-Console.git']):
+                subprocess.run(['git','-C',str(target),*args],check=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+            (root/'workbench-runtime.local.json').write_text(json.dumps({'version':1,'directory':str(target)}))
+            profile.mkdir();personal=b'{"keep":"my settings"}';(profile/'user-config.json').write_bytes(personal)
+            with socket.socket() as probe:
+                probe.bind(('127.0.0.1',0));port=probe.getsockname()[1]
+            result=subprocess.run([sys.executable,str(root/'scripts/launch_workbench.py'),'--port',str(port),'--no-browser'],
+                                  env={**os.environ,'MDM_WORKBENCH_CONFIG_DIR':str(profile)},text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=15)
+            self.assertEqual(result.returncode,0,result.stderr)
+            info=launcher.health(port);self.assertIsNotNone(info)
+            try:
+                self.assertEqual((profile/'user-config.json').read_bytes(),personal)
+                self.assertTrue((profile/'workbench-server.log').exists())
+                # 正式程序在目标目录运行，开发副本不会被服务使用。
+                log=(profile/'workbench-server.log').read_text()
+                self.assertIn(str(target),log)
+            finally:
+                os.kill(info['pid'],signal.SIGTERM)
 
     def test_foreign_port_is_reported_without_stopping_it(self):
         class ForeignHandler(BaseHTTPRequestHandler):

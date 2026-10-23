@@ -27,3 +27,4 @@ public/data/
 source-settings*.json
 user-config*.json
 updates/
+workbench-runtime.local.json

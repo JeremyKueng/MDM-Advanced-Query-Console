@@ -18,6 +18,36 @@ ROOT = Path(__file__).resolve().parents[1]
 SERVICE = "mdm-advanced-query-console"
 
 
+def linked_runtime(root=ROOT):
+    """保留原启动入口，转到独立的 GitHub 发布副本；开发仓库不参与在线更新。"""
+    marker = root / "workbench-runtime.local.json"
+    if not marker.exists():
+        return None
+    try:
+        link = json.loads(marker.read_text(encoding="utf-8"))
+        target = Path(link["directory"]).expanduser()
+        if link.get("version") != 1 or not target.is_absolute():
+            raise ValueError("运行目录格式不正确")
+        target = target.resolve()
+        if target == root.resolve() or (target / marker.name).exists() or not (target / "scripts/launch_workbench.py").is_file():
+            raise ValueError("正式运行目录不存在或存在循环跳转")
+        # 不执行标记指向的任意程序，只接受本项目的 main 发布副本。
+        from workbench_update import canonical_remote, git, PUBLISH_REPO
+        if Path(git(target, "rev-parse", "--show-toplevel")).resolve() != target or canonical_remote(git(target, "remote", "get-url", "origin")) != canonical_remote(PUBLISH_REPO) or git(target, "branch", "--show-current") != "main":
+            raise ValueError("正式运行目录不是本项目的 GitHub main 克隆版本")
+        return target
+    except (OSError, ValueError, KeyError, TypeError, RuntimeError) as error:
+        raise RuntimeError("正式运行目录无法使用，原程序、数据和配置均已保留：%s" % error)
+
+
+def launch_linked_runtime(target, arguments):
+    # 固定沿用原入口的个人配置目录，避免正式版与开发版的默认目录不同。
+    env = {**os.environ, "MDM_WORKBENCH_CONFIG_DIR": str(config_directory().resolve()),
+           "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
+    return subprocess.run([sys.executable, str(target / "scripts/launch_workbench.py"), *arguments],
+                          cwd=str(target), env=env).returncode
+
+
 def health(port):
     # 回环探测不经过系统代理，避免内网代理设置影响本地服务识别。
     opener = build_opener(ProxyHandler({}))
@@ -73,6 +103,9 @@ def main():
     if not 1 <= args.port <= 65535:
         parser.error("端口应在 1 到 65535 之间")
     try:
+        runtime = linked_runtime()
+        if runtime:
+            return launch_linked_runtime(runtime, sys.argv[1:])
         info, started = ensure_server(args.port)
     except (OSError, RuntimeError) as error:
         print("工作台启动失败：%s" % error, file=sys.stderr)
