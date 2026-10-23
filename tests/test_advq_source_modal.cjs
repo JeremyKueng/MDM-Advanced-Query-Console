@@ -159,6 +159,17 @@ async function serviceIdentity() {
   assert.equal(base,'http://127.0.0.1:4173','ignore a healthy service belonging to another app');
   assert.equal(calls.length,2);
 }
+async function changedPathDuringScan() {
+  const old=deferred(), fresh=deferred();let count=0;
+  const f=fixture('Win32',()=> (++count===1?old.promise:fresh.promise));
+  const first=f.context.loadSourceInfo('');
+  const second=f.context.loadSourceInfo('',true);
+  const current=shareInfo('Win32');current.latestCandidate.path='new-directory/materials.xlsx';
+  fresh.resolve(response(current));await second;
+  old.resolve(response(shareInfo('Win32')));await first;
+  assert.equal(count,2,'a path change starts a fresh scan while the old path is still pending');
+  assert.equal(vm.runInContext('LAST_SOURCE_INFO.info.latestCandidate.path',f.context),'new-directory/materials.xlsx','late old-path scans cannot replace the new directory');
+}
 async function main() {
   for(const platform of ['Win32','MacIntel']) {
     await slowShare(platform);
@@ -168,6 +179,7 @@ async function main() {
     await failureAndRetry(platform);
     await offline(platform);
   }
+  await changedPathDuringScan();
   await timeout();
   await serviceIdentity();
   console.log('PASS: immediate source dialog, local import before SMB checks, retained input, cache/coalescing, close races, retry, offline and timeout on Windows/macOS branches.');

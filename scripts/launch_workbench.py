@@ -46,7 +46,8 @@ def ensure_server(port):
     log_dir = config_directory()
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / "workbench-server.log"
-    options = {"cwd": str(ROOT), "stdin": subprocess.DEVNULL, "stderr": subprocess.STDOUT}
+    options = {"cwd": str(ROOT), "stdin": subprocess.DEVNULL, "stderr": subprocess.STDOUT,
+               "env": {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}}
     if os.name == "nt":
         options["creationflags"] = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
     else:

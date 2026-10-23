@@ -701,14 +701,16 @@ function resolveApiBase() {
 }
 
 function loadSourceInfo(base, force = false) {
-  if (SOURCE_INFO_REQUEST && SOURCE_INFO_REQUEST.base === base) return SOURCE_INFO_REQUEST.promise;
+  if (!force && SOURCE_INFO_REQUEST && SOURCE_INFO_REQUEST.base === base) return SOURCE_INFO_REQUEST.promise;
   if (!force && LAST_SOURCE_INFO && LAST_SOURCE_INFO.base === base && Date.now() - LAST_SOURCE_INFO.at < 30000) {
     return Promise.resolve(LAST_SOURCE_INFO.info);
   }
   const request = { base };
   request.promise = sourceJson(base + "/api/source-info", 15000).then((info) => {
-    LAST_SOURCE_INFO = { base, info, at: Date.now() };
-    updateShareStatusChip(info.shareStatus, true);
+    if (SOURCE_INFO_REQUEST === request) {
+      LAST_SOURCE_INFO = { base, info, at: Date.now() };
+      updateShareStatusChip(info.shareStatus, true);
+    }
     return info;
   }).finally(() => { if (SOURCE_INFO_REQUEST === request) SOURCE_INFO_REQUEST = null; });
   SOURCE_INFO_REQUEST = request;
@@ -784,7 +786,8 @@ async function openSourceModal() {
   let shareUnc = m.shareUnc || "", shareSmb = "";
   let connectionVersion = 0;
 
-  box.innerHTML = '<h3>' + ic("database", 16) + ' 更新数据源</h3>'
+  box.innerHTML = '<div class="source-dialog-heading"><h3>' + ic("database", 16) + ' 更新数据源</h3><button type="button" class="tool-btn" id="btnAppUpdate">' + ic("refresh", 12) + ' 检查版本更新</button></div>'
+    + '<p class="app-update-status" id="appUpdateStatus" role="status" aria-live="polite" hidden></p>'
     + '<div class="source-current"><small>当前数据</small><strong>' + esc(m.source || "—") + '</strong>'
     + '<span class="source-file-meta">' + (m.sourceRows || 0).toLocaleString() + ' 条记录 · 报表时间 ' + esc(m.sourceStamp || "—") + '</span></div>'
     + '<div class="src-route-card recommend" id="sourceSharePanel"></div>'
@@ -797,6 +800,8 @@ async function openSourceModal() {
     + '<button class="mini-btn" id="btnRoute1Path"' + (!apiReady ? ' disabled' : '') + '>' + ic("check", 12) + ' 按路径导入</button></details></div>'
     + '<p class="source-dialog-note">更新后重新计算校验和工艺路线，保留个人视图配置。</p>'
     + '<details class="source-advanced" id="sourceAdvanced"><summary>连接与数据详情</summary><div>'
+    + '<div class="source-settings-editor"><label for="srcSharePathInput">共享目录</label><input class="src-input" id="srcSharePathInput" type="text" aria-label="共享目录" placeholder="Windows UNC、映射盘符或 macOS 共享目录" value="' + esc(m.shareUnc || '') + '">'
+    + '<button type="button" class="mini-btn" id="btnSaveSharePath" disabled>保存共享路径</button><span class="source-file-meta" id="sourceSettingsStatus">保存到本机，更新程序后继续沿用。</span></div>'
     + '<div id="sourceConnectionDetails"></div>' + renderSourceLineage() + '</div></details>'
     + '<div class="macts"><button class="tool-btn" id="modalCloseSrc">关闭</button></div>';
 
@@ -810,6 +815,8 @@ async function openSourceModal() {
     if (typeof syncBodyScrollLock === "function") syncBodyScrollLock();
   };
   document.getElementById("modalCloseSrc").onclick = close;
+  if (typeof bindWorkbenchUpdateButton === "function") bindWorkbenchUpdateButton();
+  if (typeof bindSourceSettingsEditor === "function") bindSourceSettingsEditor(isCurrent, refreshConnection);
   mask.onclick = (e) => { if (e.target === mask) close(); };
 
   function renderConnection() {
@@ -2685,6 +2692,7 @@ async function init() {
   refreshAll();
   warmSourceInfo();
   document.getElementById("loading").classList.add("hide");
+  if (typeof notifyWorkbenchUpdated === "function") notifyWorkbenchUpdated();
   if (deepLinkMiss) {
     toast("URL 指定的物料未找到：" + deepLinkMiss + "（可用物料编码或 V码）", true);
   } else if (firstOpen && !state.detailPage) {

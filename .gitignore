@@ -22,3 +22,8 @@ user-config*.json
 outputs/advq/shots/
 reports/
 public/data/
+
+# Machine-specific settings and update backups stay local.
+source-settings*.json
+user-config*.json
+updates/

@@ -44,12 +44,12 @@ python3 scripts/build_adv_query_workbench.py
 
 Excel 列头必须包含“物料编码”；会在前 31 行中定位列头，按列名读取字段，缺失的列按空值处理。参考 `examples/materials-demo.xlsx` 的列名。导入后，数据会写入本地 `outputs/advq/dataset.json`、压缩数据集和生成 HTML；**重新上传仓库前须重新生成演示数据并运行发布检查**，因为这些文件会包含刚导入的记录。
 
-默认不配置任何企业内网地址、不连接共享盘。需要共享目录时，在本机设置 `.env.example` 中的环境变量；`.env` 文件不会自动加载，也不会纳入 Git。
+默认不配置任何企业内网地址、不连接共享盘。需要共享目录时，在本机填写项目 `.env`，或在页面“连接与数据详情”保存共享目录；`.env` 不会纳入 Git。
 
 - `MDM_SOURCE_XLSX`：可选默认 Excel 文件。
-- `MDM_SHARE_UNC` / `MDM_SHARE_SMB`：自行配置的共享地址。
+- `MDM_SHARE_UNC` / `MDM_SHARE_SMB`：自行配置的共享地址（首次迁移后以本机保存值为准）。
 - `MDM_SHARE_DIRS`：本地已挂载目录，以当前系统的路径分隔符分隔。
-- `MDM_WORKBENCH_CONFIG_DIR`：可选个人配置目录。
+- `MDM_WORKBENCH_CONFIG_DIR`：可选个人配置目录，在操作系统环境变量中设置；`.env` 只读取数据源路径。
 
 默认配置保存在 macOS/Linux 的 `~/.config/mdm-advanced-query-console/`，Windows 的 `%APPDATA%\mdm-advanced-query-console\`。仓库不包含个人配置、浏览历史或导入文件。
 
@@ -94,3 +94,15 @@ node tests/test_advq_source_modal.cjs
 - 自定义条件的“等于任一项”匹配完整值，“包含任一项”匹配部分文本，“开头等于”按单个前缀匹配。
 
 验证：`node tests/test_advq_columns.cjs` 与 `python3 -m unittest discover -s tests -p 'test_workbench_config.py'`。
+
+
+## 页面内更新程序与保留共享路径
+
+在“更新数据源”窗口右上角点击 **检查版本更新**。程序从本项目 GitHub 的 `main` 分支检查新版；发现更新后自动备份、预检、更新、重启本地服务并刷新页面。已是最新版本时保留当前查询，不刷新。程序更新与“更新共享盘数据”分别操作，更新程序不会重新导入源表。
+
+- 在“连接与数据详情”中填写 **共享目录**，点击 **保存共享路径**。支持 Windows UNC、映射盘符和 macOS SMB/挂载目录。保存到个人配置目录下的 `source-settings.json`，与 `user-config.json` 一起放在项目之外，更新或重新克隆项目后继续沿用。
+- 原有代码、环境变量、项目 `.env` 中的共享设置会在首次使用新版时迁移；已导入快照中的共享地址也可用于迁移。持久化设置优先，`.env` 仅按白名单读取字面值，不执行脚本、不存账号密码。路径留空并保存可以清除共享配置。
+- 当前物料的 `dataset.json` 与 `dataset.b64` 原样保留，页面使用新版代码重新生成。视图、查询、字段、详情布局和自定义检查规则仍保存在原来的个人配置文件中。备份保留在个人配置目录的 `updates/` 内；预检、文件写入或新版启动失败时恢复原版本。
+- 在线更新用于安装了 Git、通过本地“启动工作台”运行的 GitHub 克隆版，仅支持此项目 `main` 分支。首次获得此功能仍需手动拉取新版并重启一次；之后直接使用页面按钮。若有其他未提交的代码修改、暂存修改或分叉提交，会保留它们并停止更新，避免覆盖手工工作。
+
+测试：`python3 -m unittest discover -s tests -p 'test_workbench_update.py'` 使用临时本机 Git 远端验证更新、旧版回滚、后台重启和配置/数据保留，不向外上传测试数据。

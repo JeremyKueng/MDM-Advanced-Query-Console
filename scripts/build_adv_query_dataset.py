@@ -33,6 +33,13 @@ SHARE_UNC = os.environ.get("MDM_SHARE_UNC", "")
 SHARE_SMB = os.environ.get("MDM_SHARE_SMB", "")
 SHARE_MOUNT_DIRS = [Path(p).expanduser() for p in os.environ.get("MDM_SHARE_DIRS", "").split(os.pathsep) if p]
 SHARE_CANDIDATES = [*SHARE_MOUNT_DIRS, ROOT / "data/private"]
+# 本机设置优先于代码默认值，支持自动读取 .env 与旧设置迁移。
+from source_settings import builder_settings, SourceSettingsStore
+_SOURCE_PREFS = builder_settings(ROOT, SOURCE_XLSX, SHARE_UNC, SHARE_SMB, SHARE_MOUNT_DIRS)
+SOURCE_XLSX = Path(_SOURCE_PREFS["sourcePath"] or str(SOURCE_XLSX))
+SHARE_UNC, SHARE_SMB = _SOURCE_PREFS["shareUnc"], _SOURCE_PREFS["shareSmb"]
+SHARE_MOUNT_DIRS = [Path(p).expanduser() for p in _SOURCE_PREFS["shareDirs"]]
+SHARE_CANDIDATES = list(SHARE_MOUNT_DIRS) if SourceSettingsStore(ROOT).path.exists() else [*SHARE_MOUNT_DIRS, *[p for p in SHARE_CANDIDATES if p not in SHARE_MOUNT_DIRS]]
 OUT_DIR = ROOT / "outputs/advq"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -792,7 +799,7 @@ def parse_args(argv=None):
         is_share = is_share_path_str(str(src))
         return src, (f"共享盘指定报表（{src.name}）" if is_share else "本地指定文件")
     try:
-        return resolve_latest_share_excel(a.share_dir or None)
+        return resolve_latest_share_excel(a.share_dir or _SOURCE_PREFS.get("sharePath") or None)
     except FileNotFoundError as e:
         if not a.auto_share and SOURCE_XLSX.exists():
             return SOURCE_XLSX, "本地默认文件"

@@ -19,10 +19,13 @@ import json
 import os
 import re
 import sys
+import threading
 import traceback
 from datetime import datetime
 from urllib.parse import urlparse
 from workbench_config import ConfigStore, MAX_BYTES
+from source_settings import SourceSettingsStore
+from workbench_update import AppUpdater, loaded_version, BUSY
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"
@@ -35,6 +38,26 @@ GZIP_MIN_BYTES = 1024
 
 _gzip_cache = {}  # key=(path, mtime_ns, size) -> bytes
 _personal_config = ConfigStore()
+_source_config = SourceSettingsStore(ROOT)
+_app_updater = AppUpdater(ROOT)
+_loaded_version = loaded_version(ROOT)
+_data_lock = threading.Lock()
+
+
+def source_preferences(persist=False):
+    bad = _get_bad_module()
+    defaults = dict(bad._SOURCE_PREFS)
+    if not _source_config.path.exists():
+        # 老版本已导入的业务快照也可迁移共享路径，避免升级后再手动填写。
+        dataset_path = ROOT / "outputs/advq/dataset.json"
+        if dataset_path.is_file():
+            meta = json.loads(dataset_path.read_text(encoding="utf-8")).get("meta", {})
+            if not (defaults.get("sharePath") or defaults.get("shareUnc") or defaults.get("shareDirs")) and meta.get("shareUnc"):
+                defaults.update(sharePath=meta["shareUnc"], shareUnc=meta["shareUnc"])
+            if meta.get("sourceMode") != "完全虚构演示数据" and meta.get("sourcePath"):
+                defaults["sourcePath"] = meta["sourcePath"]
+    return _source_config.resolve(defaults, persist=persist)
+
 
 
 def _gzip_body(path: str, raw: bytes) -> bytes:
@@ -58,26 +81,42 @@ def _get_bad_module():
 
 def _rebuild_all(source_path: str = "", auto_share: bool = False, share_dir: str = "") -> dict:
     """调用 build_adv_query_dataset + build_adv_query_workbench 重建最新数据与单文件 HTML。"""
-    import importlib
-    bad = _get_bad_module()
-    import build_adv_query_workbench as baw
-    baw = importlib.reload(baw)
+    with _data_lock:
+        import importlib
+        if _app_updater.status()["phase"] in BUSY:
+            raise RuntimeError("程序正在更新，请完成后再导入或刷新物料数据")
+        bad = _get_bad_module()
+        share_dir = share_dir or source_preferences().get("sharePath", "")
+        import build_adv_query_workbench as baw
+        baw = importlib.reload(baw)
 
-    argv = []
-    if auto_share:
-        argv.append("--auto-share")
-        if share_dir:
-            argv.extend(["--share-dir", share_dir])
-    elif source_path:
-        argv.extend(["--source", source_path])
+        argv = []
+        if auto_share:
+            argv.append("--auto-share")
+            if share_dir:
+                argv.extend(["--share-dir", share_dir])
+        elif source_path:
+            argv.extend(["--source", source_path])
 
-    dataset = bad.main(argv)
-    baw.main()
-    _gzip_cache.clear()
-    return dataset.get("meta", {})
+        dataset = bad.main(argv)
+        baw.main()
+        _gzip_cache.clear()
+        return dataset.get("meta", {})
 
 
 class NoCacheHandler(SimpleHTTPRequestHandler):
+    def _local_request(self, allow_file=False):
+        host = urlparse("http://" + self.headers.get("Host", "")).hostname
+        origin = self.headers.get("Origin")
+        allowed = {"localhost", "127.0.0.1", "::1"}
+        valid = host in allowed
+        if origin and not (origin == "null" and allow_file):
+            parsed = urlparse(origin)
+            valid = valid and parsed.scheme == "http" and parsed.hostname in allowed and (parsed.port or 80) == self.server.server_port
+        if not valid:
+            self._send_json(403, {"ok": False, "error": "仅允许本机服务页面操作程序更新与数据源设置"})
+        return valid
+
     def _send_json(self, code: int, payload: dict) -> None:
         raw = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(code)
@@ -88,8 +127,18 @@ class NoCacheHandler(SimpleHTTPRequestHandler):
 
     def _handle_api_get(self) -> bool:
         p = self.path.split("?", 1)[0]
+        if p in ("/api/app-update", "/api/source-settings"):
+            if not self._local_request(allow_file=p == "/api/source-settings"):
+                return True
+            try:
+                data = ({**_app_updater.status(), "currentVersion": _loaded_version} if p == "/api/app-update"
+                        else {"ok": True, "settings": source_preferences(persist=True)})
+                self._send_json(200, data)
+            except (ValueError, OSError, RuntimeError) as error:
+                self._send_json(400, {"ok": False, "error": str(error)})
+            return True
         if p == "/api/health":
-            self._send_json(200, {"ok": True, "service": "mdm-advanced-query-console", "pid": os.getpid()})
+            self._send_json(200, {"ok": True, "service": "mdm-advanced-query-console", "pid": os.getpid(), "version": _loaded_version})
             return True
         if p == "/api/user-config":
             origin = self.headers.get("Origin")
@@ -113,12 +162,12 @@ class NoCacheHandler(SimpleHTTPRequestHandler):
             return False
         try:
             bad = _get_bad_module()
-            share_status = bad.probe_intranet_share_status(auto_mount=False)
+            share_status = bad.probe_intranet_share_status(raw_path=source_preferences().get("sharePath") or bad.SHARE_UNC, auto_mount=False)
             latest_file = None
             latest_mode = ""
             latest_mtime = ""
             try:
-                cand, mode = bad.resolve_latest_share_excel()
+                cand, mode = bad.resolve_latest_share_excel(source_preferences().get("sharePath") or None)
                 latest_file = str(cand)
                 latest_mode = mode
                 latest_mtime = datetime.fromtimestamp(cand.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
@@ -127,7 +176,7 @@ class NoCacheHandler(SimpleHTTPRequestHandler):
 
             share_candidates = []
             try:
-                share_candidates = bad.list_share_finished_excels()
+                share_candidates = bad.list_share_finished_excels(source_preferences().get("sharePath") or None)
             except Exception:
                 pass
 
@@ -166,6 +215,37 @@ class NoCacheHandler(SimpleHTTPRequestHandler):
     def do_POST(self):
         p = self.path.split("?", 1)[0]
         length = int(self.headers.get("Content-Length") or 0)
+        if p in ("/api/app-update", "/api/app-update/restart", "/api/source-settings"):
+            if not self._local_request(allow_file=p == "/api/source-settings"):
+                return
+            if not 0 < length <= 16384 or self.headers.get_content_type() != "application/json":
+                self._send_json(400, {"ok": False, "error": "请求格式不正确"})
+                return
+            try:
+                req = json.loads(self.rfile.read(length).decode("utf-8"))
+                if not isinstance(req, dict):
+                    raise ValueError("请求格式不正确")
+                if p == "/api/source-settings":
+                    settings = _source_config.save_shared_path(req.get("sharePath", ""), source_preferences())
+                    self._send_json(200, {"ok": True, "settings": settings})
+                elif p == "/api/app-update/restart":
+                    job = json.loads(_app_updater.job_path.read_text(encoding="utf-8"))
+                    if not req.get("jobId") or req["jobId"] != job["id"] or _app_updater.status()["phase"] != "restarting" or job["pid"] != os.getpid():
+                        raise ValueError("重启任务无效，未停止当前服务")
+                    self._send_json(200, {"ok": True})
+                    threading.Thread(target=self.server.shutdown, daemon=True).start()
+                else:
+                    if not _data_lock.acquire(blocking=False):
+                        raise RuntimeError("正在导入或刷新物料数据，请完成后再检查程序更新")
+                    try:
+                        source_preferences(persist=True)
+                        service = "mdm-advanced-query-console"
+                        self._send_json(202, _app_updater.start(self.server.server_port, os.getpid(), service))
+                    finally:
+                        _data_lock.release()
+            except (ValueError, OSError, RuntimeError) as error:
+                self._send_json(400, {"ok": False, "error": str(error)})
+            return
         if p == "/api/user-config":
             origin = self.headers.get("Origin")
             if origin and origin != "null" and urlparse(origin).hostname not in {"localhost", "127.0.0.1", "::1"}:
@@ -189,7 +269,7 @@ class NoCacheHandler(SimpleHTTPRequestHandler):
             try:
                 bad = _get_bad_module()
                 req = json.loads(body.decode("utf-8") or "{}")
-                share_dir = (req.get("shareDir") or "").strip() or bad.SHARE_UNC
+                share_dir = (req.get("shareDir") or "").strip() or source_preferences().get("sharePath") or bad.SHARE_UNC
                 status = bad.probe_intranet_share_status(raw_path=share_dir, auto_mount=True)
                 self._send_json(200, {"ok": True, "shareStatus": status})
             except Exception as e:
@@ -312,4 +392,8 @@ if __name__ == "__main__":
     print(f"深链直达：   http://localhost:{PORT}/mdm/物料编码  （直接打开该 SKU 详情）")
     print("数据源API：  /api/source-info | /api/refresh-source | /api/upload-excel")
     print("个人配置：  %s" % _personal_config.path)
-    ThreadingHTTPServer(("127.0.0.1", PORT), handler).serve_forever()
+    server = ThreadingHTTPServer(("127.0.0.1", PORT), handler)
+    try:
+        server.serve_forever()
+    finally:
+        server.server_close()
