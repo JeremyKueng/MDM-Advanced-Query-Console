@@ -11,10 +11,38 @@ function columnMenuMatches(menu = columnMenu) {
   const tokens = menu.query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
   return menu.options.filter(o => tokens.every(t => columnOptionLabel(menu.key, o.value).toLocaleLowerCase().includes(t)));
 }
+/* 先向右、再向左避让当前列；左右都放不下时在表格外展开。 */
+function columnMenuPlacement(rect, menuWidth, viewportWidth) {
+  const margin = 12, gap = 10, minWidth = 240;
+  const width = Math.min(menuWidth, Math.max(0, viewportWidth - margin * 2));
+  const rightSpace = Math.max(0, viewportWidth - margin - rect.right - gap);
+  const leftSpace = Math.max(0, rect.left - gap - margin);
+  if (rightSpace >= width) return { side: 'right', left: rect.right + gap, width };
+  if (leftSpace >= width) return { side: 'left', left: rect.left - gap - width, width };
+  const side = rightSpace >= leftSpace ? 'right' : 'left', available = Math.max(rightSpace, leftSpace);
+  if (available >= minWidth) return { side, left: side === 'right' ? rect.right + gap : rect.left - gap - available, width: available };
+  return { side: 'inline', width };
+}
+function positionColumnFilterMenu() {
+  const menu = columnMenu; if (!menu) return;
+  const { element, trigger } = menu, rect = trigger.closest('th').getBoundingClientRect();
+  const placement = columnMenuPlacement(rect, element.offsetWidth, window.innerWidth);
+  element.dataset.placement = placement.side;
+  if (placement.side === 'inline') {
+    const host = document.createElement('div'); host.className = 'column-filter-inline-host';
+    trigger.closest('.table-wrap').before(host); host.appendChild(element);
+    element.classList.add('is-inline'); menu.host = host;
+  } else {
+    element.style.width = placement.width + 'px';
+    const height = element.getBoundingClientRect().height;
+    element.style.left = placement.left + 'px';
+    element.style.top = Math.max(12, Math.min(rect.bottom + 6, window.innerHeight - height - 12)) + 'px';
+  }
+}
 function closeColumnFilterMenu(restoreFocus = false) {
   if (!columnMenu) return;
-  const { element, trigger, key } = columnMenu;
-  element.remove(); columnMenu = null;
+  const { element, trigger, key, host } = columnMenu;
+  element.remove(); host?.remove(); columnMenu = null;
   if (trigger.isConnected) trigger.setAttribute('aria-expanded', 'false');
   if (restoreFocus) {
     const target = trigger.isConnected ? trigger : [...document.querySelectorAll('[data-column-action="open"]')].find(b => b.dataset.field === key);
@@ -44,6 +72,7 @@ function renderColumnMenuValues() {
   updateColumnMenuSelection();
 }
 function openColumnFilterMenu(trigger) {
+  if (!trigger.matches("button.column-dropdown")) return;
   const key = trigger.dataset.field;
   if (!schemaByKey.has(key) || MDM_HIDDEN_KEYS.has(key)) return;
   if (columnMenu?.key === key) { closeColumnFilterMenu(true); return; }
@@ -68,11 +97,7 @@ function openColumnFilterMenu(trigger) {
   columnMenu = { key, trigger, element, options, selected: new Set(active ? state.filters.columnFilters[key] : options.map(o => o.value)), query: '', limit: 100 };
   document.body.appendChild(element); trigger.setAttribute('aria-expanded', 'true');
   renderColumnMenuValues();
-  const rect = trigger.closest('th').getBoundingClientRect();
-  const width = element.offsetWidth, height = Math.min(element.offsetHeight, window.innerHeight - 24);
-  const left = Math.max(12, Math.min(rect.left, window.innerWidth - width - 12));
-  const top = rect.bottom + height + 8 <= window.innerHeight ? rect.bottom + 6 : Math.max(12, rect.top - height - 6);
-  element.style.left = left + 'px'; element.style.top = top + 'px';
+  positionColumnFilterMenu();
   element.querySelector('[data-column-search]').focus({ preventScroll: true });
 }
 function commitColumnMenu(action) {

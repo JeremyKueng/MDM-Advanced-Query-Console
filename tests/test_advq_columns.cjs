@@ -34,6 +34,21 @@ const clean=normalizeColumnFilters({brand:['A','A'],routeStatus:['完整'],unkno
 const sample=valid.find(r=>r.vcode);state.q=sample.vcode;state.qMode='smart';state.qField='all';state.sort={key:'material',dir:-1,explicit:true};computeDerived();
 const sorted=[...derived.filtered].sort((a,b)=>compareColumnValues(a.material,b.material,'text',-1));assert.equal(ids(sorted),ids(derived.filtered));same(derived.filtered.map(r=>r.material),sorted.map(r=>r.material),'explicit header sorting overrides search relevance');
 const restored=captureUserSettings();applyUserSettings(decodeUserConfig(configDoc(restored)));assert.equal(state.sort.explicit,true);
+// Frozen columns, central columns, clipped edge columns and narrow viewports keep the selected column clear.
+for(const [rect, viewport, side] of [
+ [{left:20,right:160},1280,'right'],
+ [{left:500,right:800},1280,'right'],
+ [{left:1050,right:1200},1280,'left'],
+ [{left:300,right:1000},1280,'left'],
+ [{left:-60,right:160},1280,'right'],
+ [{left:1150,right:1500},1280,'left'],
+ [{left:20,right:150},390,'inline'],
+ [{left:180,right:560},640,'inline']]) {
+ const p=columnMenuPlacement(rect,340,viewport);assert.equal(p.side,side);
+ if(p.side==='inline')continue;
+ assert.ok(p.left>=12 && p.left+p.width<=viewport-12,'menu stays inside the viewport');
+ assert.ok(p.left>=rect.right+10 || p.left+p.width<=rect.left-10,'menu never covers the current column');
+}
 const menu={query:'a b',options:[{value:'A xx B'},{value:'A only'},{value:''}]};same(columnMenuMatches(menu).map(o=>o.value),['A xx B']);menu.query='空白';assert.equal(columnMenuMatches(menu).length,1);
 rows=[{...valid[0],material:'001',vcode:'ZX'},{...valid[0],material:'999',vcode:'ZX-more'}];
 state.q='ZX';state.qField='vcode';state.sort={key:'material',dir:-1};computeDerived();assert.equal(derived.filtered[0].material,'001','default sorting promotes the exact code');

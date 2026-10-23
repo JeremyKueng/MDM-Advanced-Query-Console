@@ -988,8 +988,8 @@ function renderResults() {
     const pinBadge = i < 4 ? '<span style="font-size:10px;color:var(--blue);margin-left:2px" title="固定冻结列">📌</span>' : "";
     const filtered = Object.prototype.hasOwnProperty.call(state.filters.columnFilters || {}, k);
     h += '<th class="column-header' + stCls + (filtered ? ' column-filtered' : '') + '" data-field="' + esc(k) + '" aria-sort="' + (on ? state.sort.dir === 1 ? 'ascending' : 'descending' : 'none') + '"><div class="column-heading">'
-      + '<button type="button" class="column-label" data-column-action="open" data-field="' + esc(k) + '" aria-label="筛选和排序：' + esc(s.label) + '" aria-haspopup="dialog" aria-expanded="false">' + esc(s.label) + pinBadge
-      + (on ? '<span class="arrow">' + (state.sort.dir === 1 ? '▲' : '▼') + '</span>' : '') + '</button>'
+      + '<span class="column-label">' + esc(s.label) + pinBadge
+      + (on ? '<span class="arrow">' + (state.sort.dir === 1 ? '▲' : '▼') + '</span>' : '') + '</span>'
       + '<button type="button" class="column-dropdown" data-column-action="open" data-field="' + esc(k) + '" aria-label="' + esc(s.label) + (filtered ? '，已筛选' : '') + '筛选菜单" aria-haspopup="dialog" aria-expanded="false">' + ic(filtered ? 'filter' : 'chevron-down', 13) + '</button></div></th>';
   }
   h += '<th class="sticky-right" title="右侧固定冻结操作列">操作 📌</th></tr></thead><tbody>';
