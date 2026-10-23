@@ -1486,9 +1486,10 @@ function syncVisibleOrder() {
 const DP_OPERATORS = [
   { op: "eq",         label: "等于 (=)" },
   { op: "neq",        label: "不等于 (≠)" },
+  { op: "prefix",     label: "开头等于" },
   { op: "contains",   label: "包含" },
   { op: "notContains",label: "不包含" },
-  { op: "in",         label: "属于 (多项逗号分隔)" },
+  { op: "in",         label: "等于任一项 (多项)" },
   { op: "notEmpty",   label: "不为空" },
   { op: "empty",      label: "为空" },
 ];
@@ -1500,7 +1501,7 @@ const DATE_OPERATORS = [
   { op: "between", label: "日期区间（含起止）" },
   { op: "notEmpty", label: "不为空" }, { op: "empty", label: "为空" },
 ];
-const CUSTOM_TEXT_OPERATORS = [...DP_OPERATORS.slice(0, 3), { op: "containsAny", label: "包含任一项 (OR)" }, ...DP_OPERATORS.slice(3)];
+const CUSTOM_TEXT_OPERATORS = DP_OPERATORS.flatMap((o) => o.op === "contains" ? [o, { op: "containsAny", label: "包含任一项 (OR)" }] : [o]);
 const CUSTOM_MAX_DEPTH = 8, CUSTOM_MAX_NODES = 200;
 function splitCustomValues(value) { return [...new Set(String(value || "").split(/[;；\r\n]+/).map((v) => v.trim().toLowerCase()).filter(Boolean))]; }
 function isDateField(key) { return ["created", "updated"].includes(key) || (schemaByKey.get(key) || {}).type === "date"; }
@@ -1528,6 +1529,9 @@ function customConditionReady(c) {
   return !!start && (c.op !== "between" || !!isoDate(c.valTo) && start <= isoDate(c.valTo));
 }
 function customConditionValueLabel(c) { return c.op === "between" ? c.val + " 至 " + c.valTo : c.val; }
+function conditionValuePlaceholder(op) {
+  return { prefix: "输入开头文本，如 100 或 VD", in: "完整值，多项用逗号分隔", containsAny: "如：面巾；餐巾（任一项匹配）" }[op] || "输入匹配值";
+}
 function mdmPresetNames() { return Object.keys(DATASET.presets).filter((name) => name !== "工艺属性检查"); }
 
 const DP_BLOCK_TYPES = [
@@ -1759,6 +1763,7 @@ function evalDpCondition(r, cond) {
   switch (cond.op) {
     case "eq": return sv.toLowerCase() === target.toLowerCase();
     case "neq": return sv.toLowerCase() !== target.toLowerCase();
+    case "prefix": return target !== "" && sv.toLowerCase().startsWith(target.toLowerCase());
     case "contains": return target !== "" && sv.toLowerCase().includes(target.toLowerCase());
     case "containsAny": return splitCustomValues(target).some((value) => sv.toLowerCase().includes(value));
     case "notContains": return target === "" || !sv.toLowerCase().includes(target.toLowerCase());
@@ -5101,7 +5106,7 @@ function renderCustomFilters() {
       const attrs = ' data-idx="' + index + '" data-part="' + part + '"';
       const field = '<input type="text" class="cfg-input custom-filter-value" data-act="custom-filter-value"' + attrs + ' aria-label="条件 ' + number + ' ' + label + '" value="' + esc(c[part] || '') + '"'
         + (picker ? ' data-date-input="true" inputmode="numeric" maxlength="10" placeholder="20260101" title="输入 YYYYMMDD 或 YYYY-MM-DD，也可点日历选日期"' : '')
-        + (legacy ? ' readonly title="原文本条件已保留，请切换运算符使用日期筛选"' : '') + (!date ? ' placeholder="' + (c.op === 'containsAny' ? '如：面巾；餐巾（任一项匹配）' : c.op === 'in' ? '多项用逗号分隔' : '输入匹配值') + '"' : '') + '>';
+        + (legacy ? ' readonly title="原文本条件已保留，请切换运算符使用日期筛选"' : '') + (!date ? ' placeholder="' + esc(conditionValuePlaceholder(c.op)) + '"' : '') + '>';
       return picker ? '<div class="custom-date">' + field + '<button type="button" data-date-action="open"' + attrs + ' aria-label="打开条件 ' + number + ' ' + label + '日历" aria-haspopup="dialog" aria-expanded="false">' + ic("calendar", 14) + '</button></div>' : field;
     };
     const invalid = date && !legacy && !noValue && [c.val, ...(range ? [c.valTo] : [])].some((v) => v && !isoDate(v));
@@ -6278,7 +6283,7 @@ function renderDpConfigModal() {
               + '<select class="cfg-select" data-act="dp-cond-op" data-tpl="' + esc(t.id) + '" data-idx="' + ci + '">'
               + DP_OPERATORS.map((o) => '<option value="' + o.op + '"' + (c.op === o.op ? " selected" : "") + ">" + esc(o.label) + "</option>").join("")
               + "</select>"
-              + (c.op === "empty" || c.op === "notEmpty" ? "" : '<input type="text" class="cfg-input" style="min-width:220px" placeholder="输入匹配值（属于多项用逗号分隔，如 面巾,纸巾,餐巾）" data-act="dp-cond-val" data-tpl="' + esc(t.id) + '" data-idx="' + ci + '" value="' + esc(c.val || "") + '">')
+              + (c.op === "empty" || c.op === "notEmpty" ? "" : '<input type="text" class="cfg-input" style="min-width:220px" placeholder="' + esc(conditionValuePlaceholder(c.op)) + '" data-act="dp-cond-val" data-tpl="' + esc(t.id) + '" data-idx="' + ci + '" value="' + esc(c.val || "") + '">')
               + '<button class="mini-btn danger" data-act="dp-cond-del" data-tpl="' + esc(t.id) + '" data-idx="' + ci + '">' + ic("x", 12) + " 删除</button>"
               + "</div>";
           });
@@ -6364,7 +6369,7 @@ function renderDpConfigModal() {
           + '<select class="cfg-select" data-act="dp-cond-op" data-tpl="' + esc(curTpl.id) + '" data-idx="' + ci + '">'
           + DP_OPERATORS.map((o) => '<option value="' + o.op + '"' + (c.op === o.op ? " selected" : "") + ">" + esc(o.label) + "</option>").join("")
           + "</select>"
-          + (c.op === "empty" || c.op === "notEmpty" ? "" : '<input type="text" class="cfg-input" style="min-width:210px" placeholder="匹配值（多项用逗号分隔）" data-act="dp-cond-val" data-tpl="' + esc(curTpl.id) + '" data-idx="' + ci + '" value="' + esc(c.val || "") + '">')
+          + (c.op === "empty" || c.op === "notEmpty" ? "" : '<input type="text" class="cfg-input" style="min-width:210px" placeholder="' + esc(conditionValuePlaceholder(c.op)) + '" data-act="dp-cond-val" data-tpl="' + esc(curTpl.id) + '" data-idx="' + ci + '" value="' + esc(c.val || "") + '">')
           + '<button class="mini-btn danger" data-act="dp-cond-del" data-tpl="' + esc(curTpl.id) + '" data-idx="' + ci + '">' + ic("x", 12) + "</button>"
           + "</div>";
       });

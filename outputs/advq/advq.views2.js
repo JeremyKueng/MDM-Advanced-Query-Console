@@ -746,7 +746,7 @@ function renderDpConfigModal() {
               + '<select class="cfg-select" data-act="dp-cond-op" data-tpl="' + esc(t.id) + '" data-idx="' + ci + '">'
               + DP_OPERATORS.map((o) => '<option value="' + o.op + '"' + (c.op === o.op ? " selected" : "") + ">" + esc(o.label) + "</option>").join("")
               + "</select>"
-              + (c.op === "empty" || c.op === "notEmpty" ? "" : '<input type="text" class="cfg-input" style="min-width:220px" placeholder="输入匹配值（属于多项用逗号分隔，如 面巾,纸巾,餐巾）" data-act="dp-cond-val" data-tpl="' + esc(t.id) + '" data-idx="' + ci + '" value="' + esc(c.val || "") + '">')
+              + (c.op === "empty" || c.op === "notEmpty" ? "" : '<input type="text" class="cfg-input" style="min-width:220px" placeholder="' + esc(conditionValuePlaceholder(c.op)) + '" data-act="dp-cond-val" data-tpl="' + esc(t.id) + '" data-idx="' + ci + '" value="' + esc(c.val || "") + '">')
               + '<button class="mini-btn danger" data-act="dp-cond-del" data-tpl="' + esc(t.id) + '" data-idx="' + ci + '">' + ic("x", 12) + " 删除</button>"
               + "</div>";
           });
@@ -832,7 +832,7 @@ function renderDpConfigModal() {
           + '<select class="cfg-select" data-act="dp-cond-op" data-tpl="' + esc(curTpl.id) + '" data-idx="' + ci + '">'
           + DP_OPERATORS.map((o) => '<option value="' + o.op + '"' + (c.op === o.op ? " selected" : "") + ">" + esc(o.label) + "</option>").join("")
           + "</select>"
-          + (c.op === "empty" || c.op === "notEmpty" ? "" : '<input type="text" class="cfg-input" style="min-width:210px" placeholder="匹配值（多项用逗号分隔）" data-act="dp-cond-val" data-tpl="' + esc(curTpl.id) + '" data-idx="' + ci + '" value="' + esc(c.val || "") + '">')
+          + (c.op === "empty" || c.op === "notEmpty" ? "" : '<input type="text" class="cfg-input" style="min-width:210px" placeholder="' + esc(conditionValuePlaceholder(c.op)) + '" data-act="dp-cond-val" data-tpl="' + esc(curTpl.id) + '" data-idx="' + ci + '" value="' + esc(c.val || "") + '">')
           + '<button class="mini-btn danger" data-act="dp-cond-del" data-tpl="' + esc(curTpl.id) + '" data-idx="' + ci + '">' + ic("x", 12) + "</button>"
           + "</div>";
       });

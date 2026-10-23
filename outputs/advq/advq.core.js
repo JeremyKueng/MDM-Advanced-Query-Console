@@ -200,9 +200,10 @@ function syncVisibleOrder() {
 const DP_OPERATORS = [
   { op: "eq",         label: "等于 (=)" },
   { op: "neq",        label: "不等于 (≠)" },
+  { op: "prefix",     label: "开头等于" },
   { op: "contains",   label: "包含" },
   { op: "notContains",label: "不包含" },
-  { op: "in",         label: "属于 (多项逗号分隔)" },
+  { op: "in",         label: "等于任一项 (多项)" },
   { op: "notEmpty",   label: "不为空" },
   { op: "empty",      label: "为空" },
 ];
@@ -214,7 +215,7 @@ const DATE_OPERATORS = [
   { op: "between", label: "日期区间（含起止）" },
   { op: "notEmpty", label: "不为空" }, { op: "empty", label: "为空" },
 ];
-const CUSTOM_TEXT_OPERATORS = [...DP_OPERATORS.slice(0, 3), { op: "containsAny", label: "包含任一项 (OR)" }, ...DP_OPERATORS.slice(3)];
+const CUSTOM_TEXT_OPERATORS = DP_OPERATORS.flatMap((o) => o.op === "contains" ? [o, { op: "containsAny", label: "包含任一项 (OR)" }] : [o]);
 const CUSTOM_MAX_DEPTH = 8, CUSTOM_MAX_NODES = 200;
 function splitCustomValues(value) { return [...new Set(String(value || "").split(/[;；\r\n]+/).map((v) => v.trim().toLowerCase()).filter(Boolean))]; }
 function isDateField(key) { return ["created", "updated"].includes(key) || (schemaByKey.get(key) || {}).type === "date"; }
@@ -242,6 +243,9 @@ function customConditionReady(c) {
   return !!start && (c.op !== "between" || !!isoDate(c.valTo) && start <= isoDate(c.valTo));
 }
 function customConditionValueLabel(c) { return c.op === "between" ? c.val + " 至 " + c.valTo : c.val; }
+function conditionValuePlaceholder(op) {
+  return { prefix: "输入开头文本，如 100 或 VD", in: "完整值，多项用逗号分隔", containsAny: "如：面巾；餐巾（任一项匹配）" }[op] || "输入匹配值";
+}
 function mdmPresetNames() { return Object.keys(DATASET.presets).filter((name) => name !== "工艺属性检查"); }
 
 const DP_BLOCK_TYPES = [
@@ -473,6 +477,7 @@ function evalDpCondition(r, cond) {
   switch (cond.op) {
     case "eq": return sv.toLowerCase() === target.toLowerCase();
     case "neq": return sv.toLowerCase() !== target.toLowerCase();
+    case "prefix": return target !== "" && sv.toLowerCase().startsWith(target.toLowerCase());
     case "contains": return target !== "" && sv.toLowerCase().includes(target.toLowerCase());
     case "containsAny": return splitCustomValues(target).some((value) => sv.toLowerCase().includes(value));
     case "notContains": return target === "" || !sv.toLowerCase().includes(target.toLowerCase());

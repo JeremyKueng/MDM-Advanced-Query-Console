@@ -8,11 +8,13 @@ const same=(a,b,message)=>assert.equal(JSON.stringify(a),JSON.stringify(b),messa
 const leaf=(field,op,val)=>({field,op,val});
 const group=(logic,...conditions)=>({type:'group',logic,conditions});
 const valid=rows.filter(r=>r.status==='有效');
+const codePrefix=valid[0].material.slice(0,-2);
 const cases=[
  ['AND',[leaf('brand','notEmpty',''),group('OR',leaf('cat','eq','面巾'),leaf('cat','eq','餐巾'))],r=>!!r.brand&&(r.cat==='面巾'||r.cat==='餐巾')],
  ['OR',[group('AND',leaf('cat','eq','面巾'),leaf('pre','eq','Y')),group('AND',leaf('cat','eq','餐巾'),leaf('pre','eq','X'))],r=>r.cat==='面巾'&&r.pre==='Y'||r.cat==='餐巾'&&r.pre==='X'],
  ['AND',[group('OR',leaf('cat','eq','面巾'),group('AND',leaf('cat','eq','餐巾'),group('OR',leaf('pre','eq','Y'),leaf('pre','eq','X'))))],r=>r.cat==='面巾'||r.cat==='餐巾'&&(r.pre==='Y'||r.pre==='X')],
  ['AND',[leaf('desc','containsAny','面巾； 餐巾;不存在')],r=>r.desc.includes('面巾')||r.desc.includes('餐巾')],
+ ['AND',[group('OR',leaf('material','prefix',codePrefix),leaf('cat','eq','面巾'))],r=>r.material.startsWith(codePrefix)||r.cat==='面巾'],
  ['AND',[group('OR'),group('AND',leaf('created','gte','202601'))],()=>true],
 ];
 for(const [logic,conditions,expected] of cases){
@@ -25,10 +27,19 @@ assert.equal(evalDpCondition({desc:'Alpha Beta 包装' },leaf('desc','contains',
 assert.equal(evalDpCondition({desc:'面巾，餐巾' },leaf('desc','containsAny','面巾，餐巾')) ,true,'comma can remain literal');
 assert.equal(customConditionReady(leaf('desc','containsAny',' ;； ')),false);
 same(splitCustomValues('A; a； b\nB'),['a','b']);
-state.filters.customConditions=[group('AND',group('OR',leaf('cat','eq','面巾'),leaf('updated','gte','20260101')))];
+for(const [value,prefix,expected] of [['VD001','vd',true],['XVD001','VD',false],['  VD001  ',' VD ',true],['面巾专用','面巾',true],['100200','100',true],['X100200','100',false],[null,'100',false],['ABC','',false],['ABC','   ',false],[0,0,true],['VD001','VD;XY',false],['[A].*物料','[A].*',true]]) {
+ assert.equal(evalDpCondition({desc:value},leaf('desc','prefix',prefix)),expected,'literal prefix: '+value+' / '+prefix);
+}
+const businessRow={brand:'品牌A-商用'};
+assert.equal(evalDpCondition(businessRow,leaf('brand','in','品牌A,品牌B')),false,'membership compares the complete field value');
+assert.equal(evalDpCondition(businessRow,leaf('brand','containsAny','品牌A；品牌B')),true,'contains-any compares substrings');
+assert.equal(evalDpCondition({brand:'品牌A'},leaf('brand','in','品牌A,品牌B')),true,'legacy membership keeps its behavior');
+assert.equal(filterConditionOperators('updated').some(o=>o.op==='prefix'),false,'date fields keep date-only choices');
+assert.equal(customConditionReady(leaf('material','prefix','')),false);
+state.filters.customConditions=[group('AND',group('OR',leaf('cat','eq','面巾'),leaf('updated','gte','20260101'),leaf('material','prefix',codePrefix)))];
 assert.equal(customFilterNode('0.0.1').field,'updated');
 assert.equal(customFilterNode('0.0.9'),null);assert.equal(customFilterNode('0.__proto__'),null);
-assert.equal(customFilterChildren('0.0').length,2);
+assert.equal(customFilterChildren('0.0').length,3);
 const draft=captureQueryContext();
 state.queryViews=[{id:'nested',name:'嵌套查询',context:draft}];
 const settings=captureUserSettings();
@@ -41,6 +52,8 @@ assert.equal(draft.filters.customConditions[0].conditions[0].conditions[0].val,'
 const html=renderCustomFilters();
 assert.ok(html.includes('data-idx="0.0.1"'));assert.ok(html.includes('打开条件 1.1.2 日期日历'));
 assert.ok(html.includes('包含任一项 (OR)'));assert.ok(html.includes('data-parent="0.0"'));
+assert.ok(html.includes('开头等于'));assert.ok(html.includes('等于任一项 (多项)'));assert.ok(html.includes('输入开头文本，如 100 或 VD'));
+assert.equal(state.filters.customConditions[0].conditions[0].conditions[2].op,'prefix','prefix survives personal settings and saved-query round trips');
 for(const bad of [[{type:'group',logic:'XOR',conditions:[]}],[{type:'group',logic:'AND',conditions:'bad'}],[{type:'group',logic:'AND',conditions:[{}]}]])assert.throws(()=>validateCustomConditions(bad));
 let tooDeep=leaf('cat','eq','面巾');for(let i=0;i<9;i++)tooDeep=group('OR',tooDeep);
 assert.throws(()=>validateCustomConditions([tooDeep]),/嵌套/);

@@ -611,7 +611,7 @@ function renderCustomFilters() {
       const attrs = ' data-idx="' + index + '" data-part="' + part + '"';
       const field = '<input type="text" class="cfg-input custom-filter-value" data-act="custom-filter-value"' + attrs + ' aria-label="条件 ' + number + ' ' + label + '" value="' + esc(c[part] || '') + '"'
         + (picker ? ' data-date-input="true" inputmode="numeric" maxlength="10" placeholder="20260101" title="输入 YYYYMMDD 或 YYYY-MM-DD，也可点日历选日期"' : '')
-        + (legacy ? ' readonly title="原文本条件已保留，请切换运算符使用日期筛选"' : '') + (!date ? ' placeholder="' + (c.op === 'containsAny' ? '如：面巾；餐巾（任一项匹配）' : c.op === 'in' ? '多项用逗号分隔' : '输入匹配值') + '"' : '') + '>';
+        + (legacy ? ' readonly title="原文本条件已保留，请切换运算符使用日期筛选"' : '') + (!date ? ' placeholder="' + esc(conditionValuePlaceholder(c.op)) + '"' : '') + '>';
       return picker ? '<div class="custom-date">' + field + '<button type="button" data-date-action="open"' + attrs + ' aria-label="打开条件 ' + number + ' ' + label + '日历" aria-haspopup="dialog" aria-expanded="false">' + ic("calendar", 14) + '</button></div>' : field;
     };
     const invalid = date && !legacy && !noValue && [c.val, ...(range ? [c.valTo] : [])].some((v) => v && !isoDate(v));

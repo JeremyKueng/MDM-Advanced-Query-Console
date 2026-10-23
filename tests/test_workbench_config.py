@@ -24,6 +24,7 @@ class ConfigStoreTests(unittest.TestCase):
         tree = [{"type": "group", "logic": "OR", "conditions": [
             {"field": "desc", "op": "containsAny", "val": "面巾；餐巾"},
             {"type": "group", "logic": "AND", "conditions": [
+                {"field": "material", "op": "prefix", "val": "100"},
                 {"field": "created", "op": "gte", "val": "20260101"}]}]}]
         doc["settings"]["filters"] = {"customLogic": "AND", "customConditions": tree}
         self.store.save(doc)
