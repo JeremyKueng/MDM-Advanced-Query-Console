@@ -1,4 +1,4 @@
-/* 视图预设顺序独立保存；拖动不应用视图、不改字段或查询。 */
+/* 视图预设与查询结果快捷入口共用顺序；拖动不应用视图、不改字段或查询。 */
 function movePresetView(name, before) {
   const current = mdmPresetNames();
   if (!current.includes(name) || before === name || before !== null && !current.includes(before)) return false;
@@ -6,15 +6,12 @@ function movePresetView(name, before) {
   next.splice(before === null ? next.length : next.indexOf(before), 0, name);
   if (JSON.stringify(next) === JSON.stringify(current)) return false;
   state.presetViewOrder = next;
-  const pool = document.getElementById("fdPresetList"), focused = document.activeElement;
-  if (pool) {
-    const nodes = new Map([...pool.children].map((node) => [node.dataset.v, node]));
-    next.forEach((p) => { if (nodes.has(p)) pool.appendChild(nodes.get(p)); });
-    if (focused && pool.contains(focused)) focused.focus({ preventScroll: true });
-  }
-  saveState(); renderViewShortcuts();
+  state.viewShortcuts = orderPresetShortcuts(state.viewShortcuts);
+  if (shortcutDraft) shortcutDraft = orderPresetShortcuts(shortcutDraft);
+  syncPresetViewControls();
+  saveState(); renderViewShortcuts(); renderShortcutEditor();
   const status = document.getElementById("fdPresetSortStatus");
-  if (status) status.textContent = "预设顺序已保存";
+  if (status) status.textContent = "预设与查询结果快捷视图顺序已同步保存";
   return true;
 }
 function bindPresetViewSorting() {

@@ -1346,7 +1346,8 @@ function onClick(e) {
       break;
     }
     case "save-shortcuts":
-      state.viewShortcuts = [...(shortcutDraft || [])]; saveState(); renderViewShortcuts(); renderShortcutEditor();
+      state.viewShortcuts = [...(shortcutDraft || [])]; updatePresetOrderFromShortcuts(state.viewShortcuts);
+      saveState(); syncPresetViewControls(); renderViewShortcuts(); renderShortcutEditor();
       toast("已保存常用视图入口与排列顺序"); break;
     case "open-personal-config": openPersonalConfig(); break;
     case "config-export": exportPersonalConfig(); break;

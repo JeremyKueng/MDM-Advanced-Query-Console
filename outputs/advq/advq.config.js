@@ -13,6 +13,18 @@ function fieldViewOptions() {
     .concat(state.savedViews.map((v) => ({ id: "view:" + v.id, name: v.name, builtin: false })));
 }
 function defaultShortcuts() { return ["日常查料", "包装视图", "重量尺寸", "维护信息"].map((name) => "preset:" + name); }
+function orderPresetShortcuts(shortcuts) {
+  const ids = mdmPresetNames().map((name) => "preset:" + name), selected = new Set(shortcuts);
+  const ordered = ids.filter((id) => selected.has(id));
+  let i = 0;
+  return shortcuts.map((id) => ids.includes(id) ? ordered[i++] : id);
+}
+function updatePresetOrderFromShortcuts(shortcuts) {
+  const current = mdmPresetNames(), selected = shortcuts.filter((id) => id.startsWith("preset:") && current.includes(id.slice(7))).map((id) => id.slice(7));
+  const included = new Set(selected); let i = 0;
+  const next = current.map((name) => included.has(name) ? selected[i++] : name);
+  if (JSON.stringify(next) !== JSON.stringify(current)) state.presetViewOrder = next;
+}
 function defaultQuickDetailView() {
   return { version: 1, columns: 3, hideEmpty: false, showDescription: true, showAnalysis: true, showAllFields: true, sections: [
     { id: "identity", title: "识别与分类", enabled: true, fields: ['vcode','spec','brand','cat','stock','制造类别','formula','status','pre','unit'] },
@@ -105,6 +117,8 @@ function applyUserSettings(s) {
   const options = new Set(fieldViewOptions().map((o) => o.id));
   state.activeFieldView = options.has(s.activeFieldView) ? s.activeFieldView : Array.isArray(s.visible) ? "" : "preset:日常查料";
   state.viewShortcuts = (Array.isArray(s.viewShortcuts) ? stringsOnly(s.viewShortcuts) : defaultShortcuts()).filter((k) => options.has(k));
+  if (!state.presetViewOrder.length) updatePresetOrderFromShortcuts(state.viewShortcuts);
+  state.viewShortcuts = orderPresetShortcuts(state.viewShortcuts);
   state.view = s.view === "card" ? "card" : "table";
   state.tab = ["results", "focus", "vconf", "process", "analyze", "rules", "mps"].includes(s.tab) ? s.tab : "results";
   state.q = typeof s.q === "string" ? s.q : "";
@@ -272,12 +286,13 @@ function renderViewShortcuts() {
   const el = document.getElementById("resultViewShortcuts"); if (!el) return;
   const all = new Map(fieldViewOptions().map((v) => [v.id, v]));
   const selected = state.activeFieldView && !fieldViewIsDirty() ? state.activeFieldView : "";
-  el.innerHTML = '<span class="view-shortcut-label">展示字段</span><div class="view-shortcut-list">' + state.viewShortcuts.filter((id) => all.has(id)).map((id) => '<button class="tool-btn' + (selected === id ? ' active' : '') + '" data-act="field-view-apply" data-v="' + esc(id) + '" title="只切换字段，不改变搜索和筛选">' + esc(all.get(id).name) + '</button>').join("")
+  el.innerHTML = '<span class="view-shortcut-label">展示字段</span><div class="view-shortcut-list">' + orderPresetShortcuts(state.viewShortcuts).filter((id) => all.has(id)).map((id) => '<button class="tool-btn' + (selected === id ? ' active' : '') + '" aria-pressed="' + (selected === id) + '" data-act="field-view-apply" data-v="' + esc(id) + '" title="只切换字段，不改变搜索和筛选">' + esc(all.get(id).name) + '</button>').join("")
     + '</div><select class="field-view-picker" data-act="field-view-select" aria-label="更多字段组合"><option value="">更多字段…</option>'
     + [...all.values()].map((v) => '<option value="' + esc(v.id) + '">' + esc(v.name) + '</option>').join("") + '</select>'
     + '<button class="view-shortcut-config" data-act="configure-shortcuts" title="选择常用字段组合及排列顺序">' + ic("settings", 13) + '</button>';
 }
 function syncSavedViewControls() {
+  syncPresetViewControls();
   const sel = document.getElementById("fdSavedViewSel"); if (!sel) return;
   const active = state.savedViews.find((v) => "view:" + v.id === state.activeFieldView);
   sel.innerHTML = '<option value="">新增自定义视图</option>' + state.savedViews.map((v) => '<option value="view:' + esc(v.id) + '">' + esc(v.name) + '</option>').join("");
@@ -290,6 +305,18 @@ function syncSavedViewControls() {
   document.getElementById("fdViewNew").disabled = !active;
   updatePersonalConfigStatus();
   renderViewShortcuts();
+}
+function syncPresetViewControls() {
+  const pool = document.getElementById("fdPresetList"); if (!pool) return;
+  const focused = document.activeElement, nodes = new Map([...pool.children].map((node) => [node.dataset.v, node]));
+  const selected = state.activeFieldView && !fieldViewIsDirty() ? state.activeFieldView : "";
+  mdmPresetNames().forEach((name) => {
+    const node = nodes.get(name); if (!node) return;
+    const on = selected === "preset:" + name;
+    node.classList.toggle("active", on); node.setAttribute("aria-pressed", String(on));
+    pool.appendChild(node);
+  });
+  if (focused && pool.contains(focused)) focused.focus({ preventScroll: true });
 }
 function renderShortcutEditor() {
   const el = document.getElementById("fdShortcutOptions"); if (!el) return;
