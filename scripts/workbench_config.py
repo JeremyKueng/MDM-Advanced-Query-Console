@@ -56,7 +56,7 @@ def validate_document(value):
         if key in obj and (not isinstance(obj[key], list) or any(not isinstance(x, str) for x in obj[key])):
             raise ValueError("配置中的 %s 必须为文本列表" % key)
 
-    for key in ("order", "visible", "basket", "expandedMore", "viewShortcuts"):
+    for key in ("order", "visible", "basket", "expandedMore", "viewShortcuts", "presetViewOrder"):
         string_list(settings, key)
     if isinstance(settings.get("filters"), dict) and "customConditions" in settings["filters"]:
         validate_conditions(settings["filters"]["customConditions"])
@@ -199,7 +199,7 @@ class ConfigStore:
                     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%f")
                     self._atomic_write(self.directory / ("user-config.damaged-" + stamp + ".json"), self.path.read_bytes())
             # 旧标签页缺少新配置字段时，保存其他偏好不能抹掉已存规则与速览布局。
-            for key in ("processRules", "quickDetailView"):
+            for key in ("processRules", "quickDetailView", "presetViewOrder"):
                 if previous and key not in document["settings"] and key in previous["settings"]:
                     document = {**document, "settings": {**document["settings"], key: previous["settings"][key]}}
             # 旧版本没有表头筛选字段，不能覆盖新版已保存的筛选；新版传入 {} 才表示清空。

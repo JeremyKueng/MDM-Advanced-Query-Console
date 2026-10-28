@@ -1,3 +1,84 @@
+/* 视图预设顺序独立保存；拖动不应用视图、不改字段或查询。 */
+function movePresetView(name, before) {
+  const current = mdmPresetNames();
+  if (!current.includes(name) || before === name || before !== null && !current.includes(before)) return false;
+  const next = current.filter((p) => p !== name);
+  next.splice(before === null ? next.length : next.indexOf(before), 0, name);
+  if (JSON.stringify(next) === JSON.stringify(current)) return false;
+  state.presetViewOrder = next;
+  const pool = document.getElementById("fdPresetList"), focused = document.activeElement;
+  if (pool) {
+    const nodes = new Map([...pool.children].map((node) => [node.dataset.v, node]));
+    next.forEach((p) => { if (nodes.has(p)) pool.appendChild(nodes.get(p)); });
+    if (focused && pool.contains(focused)) focused.focus({ preventScroll: true });
+  }
+  saveState(); renderViewShortcuts();
+  const status = document.getElementById("fdPresetSortStatus");
+  if (status) status.textContent = "预设顺序已保存";
+  return true;
+}
+function bindPresetViewSorting() {
+  const body = document.getElementById("fieldBody");
+  let active = null, suppressClickUntil = 0;
+  const clear = () => body.querySelectorAll("[data-preset-before],[data-preset-after]").forEach((node) => { delete node.dataset.presetBefore; delete node.dataset.presetAfter; });
+  function finish() {
+    const previous = active; active = null;
+    if (previous) {
+      previous.item.classList.remove("preset-dragging");
+      if (body.hasPointerCapture(previous.pointerId)) body.releasePointerCapture(previous.pointerId);
+    }
+    clear();
+  }
+  function targetAt(e) {
+    if (!active || !active.pool.isConnected || !document.elementFromPoint(e.clientX, e.clientY)?.closest("#fdPresetList")) return null;
+    const nodes = [...active.pool.children].filter((node) => node !== active.item);
+    const before = nodes.find((node) => {
+      const rect = node.getBoundingClientRect();
+      return e.clientY < rect.top || e.clientY <= rect.bottom && e.clientX < rect.left + rect.width / 2;
+    }) || null;
+    return { before, last: nodes[nodes.length - 1] };
+  }
+  body.addEventListener("pointerdown", (e) => {
+    const item = e.target.closest("#fdPresetList [data-act=preset]");
+    if (!item || active || e.button !== 0) return;
+    active = { item, pool: item.parentElement, pointerId: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
+  });
+  document.addEventListener("pointermove", (e) => {
+    if (!active || active.pointerId !== e.pointerId) return;
+    if (!active.item.isConnected) { finish(); return; }
+    if (!active.moved) {
+      if (Math.hypot(e.clientX - active.x, e.clientY - active.y) < 5) return;
+      active.moved = true; body.setPointerCapture(e.pointerId); active.item.classList.add("preset-dragging");
+    }
+    e.preventDefault(); clear();
+    const target = targetAt(e);
+    if (target?.before) target.before.dataset.presetBefore = "";
+    else if (target?.last) target.last.dataset.presetAfter = "";
+  }, { passive: false });
+  document.addEventListener("pointerup", (e) => {
+    if (!active || active.pointerId !== e.pointerId) return;
+    const target = active.moved ? targetAt(e) : null, name = active.item.dataset.v;
+    if (active.moved) { e.preventDefault(); suppressClickUntil = Date.now() + 250; }
+    finish();
+    if (target) movePresetView(name, target.before ? target.before.dataset.v : null);
+  });
+  document.addEventListener("pointercancel", finish);
+  body.addEventListener("lostpointercapture", finish);
+  window.addEventListener("blur", finish);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && active?.moved) { e.preventDefault(); suppressClickUntil = Date.now() + 250; finish(); return; }
+    const item = e.target.closest("#fdPresetList [data-act=preset]");
+    if (!item || !e.altKey || !["ArrowLeft", "ArrowRight"].includes(e.key)) return;
+    e.preventDefault();
+    const names = mdmPresetNames(), from = names.indexOf(item.dataset.v), to = from + (e.key === "ArrowLeft" ? -1 : 1);
+    if (to >= 0 && to < names.length) movePresetView(item.dataset.v, to < from ? names[to] : names[to + 1] || null);
+  });
+  body.addEventListener("dragstart", (e) => { if (e.target.closest("#fdPresetList")) e.preventDefault(); });
+  document.addEventListener("click", (e) => {
+    if (Date.now() < suppressClickUntil && e.target.closest("#fdPresetList")) { e.preventDefault(); e.stopImmediatePropagation(); }
+  }, true);
+}
+
 /* 模板编辑器的字段/区块排序：仅重排当前列表，保留编辑器 DOM、滚动位置和焦点。 */
 function dpFieldListFor(data) {
   const tpl = state.dpTemplates.find((t) => t.id === data.tpl);

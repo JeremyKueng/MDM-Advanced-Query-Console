@@ -2658,6 +2658,7 @@ async function init() {
   window.addEventListener("pagehide", saveState);
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") saveState(); });
   bindFieldDrag();
+  bindPresetViewSorting();
   bindQuickDetailConfig();
   bindDpConfigSorting();
   bindCustomDatePickers();

@@ -39,7 +39,7 @@ function captureUserSettings() {
   const f = state.filters;
   return {
     v: 8, view: state.view, tab: state.tab, order: [...state.order], visible: orderedVisibleKeys(),
-    savedViews: state.savedViews, activeFieldView: state.activeFieldView, viewShortcuts: state.viewShortcuts,
+    savedViews: state.savedViews, activeFieldView: state.activeFieldView, viewShortcuts: state.viewShortcuts, presetViewOrder: [...state.presetViewOrder],
     q: state.q, qMode: state.qMode, qField: state.qField, filterCollapsed: state.filterCollapsed, queryUiVersion: 1,
     queryViews: state.queryViews, activeQueryView: state.activeQueryView,
     expandedMore: [...state.expandedMore], sort: state.sort, pageSize: state.pageSize, basket: state.basket,
@@ -59,7 +59,7 @@ function decodeUserConfig(doc) {
     s = doc.settings;
   } else if (doc.type && doc.type !== "wb_mdm_advq_backup") throw new Error("不是工作台个人配置文件");
   if (!s || !Number.isInteger(s.v) || s.v < 1 || s.v > 8) throw new Error("配置版本无效或暂不支持");
-  const arrayKeys = ["order", "visible", "basket", "expandedMore", "viewShortcuts"];
+  const arrayKeys = ["order", "visible", "basket", "expandedMore", "viewShortcuts", "presetViewOrder"];
   for (const k of arrayKeys) if (k in s && (!Array.isArray(s[k]) || s[k].some((x) => typeof x !== "string"))) throw new Error(k + " 配置格式不正确");
   if (s.filters && (typeof s.filters !== "object" || Array.isArray(s.filters))) throw new Error("筛选配置格式不正确");
   for (const k of ["mfg", "formula", "cats", "stocks", "brands", "customConditions"]) if (s.filters && k in s.filters && !Array.isArray(s.filters[k])) throw new Error("筛选项 " + k + " 格式不正确");
@@ -101,6 +101,7 @@ function applyUserSettings(s) {
   state.visible = visible(Array.isArray(s.visible) ? s.visible : QUERY_FIELD_BUNDLES["日常查料"]);
   syncVisibleOrder();
   state.savedViews = (s.savedViews || []).map((v) => ({ id: v.id, name: v.name.trim().slice(0, 40), order: order(v.order || v.visible), visible: visible(v.visible) }));
+  state.presetViewOrder = stringsOnly(s.presetViewOrder).filter((name) => name !== "工艺属性检查" && Object.prototype.hasOwnProperty.call(DATASET.presets, name));
   const options = new Set(fieldViewOptions().map((o) => o.id));
   state.activeFieldView = options.has(s.activeFieldView) ? s.activeFieldView : Array.isArray(s.visible) ? "" : "preset:日常查料";
   state.viewShortcuts = (Array.isArray(s.viewShortcuts) ? stringsOnly(s.viewShortcuts) : defaultShortcuts()).filter((k) => options.has(k));

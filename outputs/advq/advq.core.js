@@ -129,7 +129,7 @@ const SEARCH_FIELDS = [
 const state = {
   view: "table",             // table | card
   tab: "results",            // results | focus | vconf | analyze | rules | mps
-  savedViews: [], activeFieldView: "", viewShortcuts: [], fieldViewDraftName: null,
+  savedViews: [], activeFieldView: "", viewShortcuts: [], presetViewOrder: [], fieldViewDraftName: null,
   queryViews: [], activeQueryView: "",
   order: [],                 // 字段 key 顺序（全部字段）
   visible: [],               // 可见字段 key
@@ -247,7 +247,10 @@ function customConditionValueLabel(c) { return c.op === "between" ? c.val + " �
 function conditionValuePlaceholder(op) {
   return { prefix: "输入开头文本，如 100 或 VD", in: "完整值，多项用逗号分隔", containsAny: "如：面巾；餐巾（任一项匹配）" }[op] || "输入匹配值";
 }
-function mdmPresetNames() { return Object.keys(DATASET.presets).filter((name) => name !== "工艺属性检查"); }
+function mdmPresetNames() {
+  const names = Object.keys(DATASET.presets).filter((name) => name !== "工艺属性检查");
+  return [...new Set([...state.presetViewOrder, ...names])].filter((name) => names.includes(name));
+}
 
 const DP_BLOCK_TYPES = [
   { type: "banner",        label: "顶部通栏标识卡 (Banner)" },

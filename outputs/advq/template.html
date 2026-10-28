@@ -528,6 +528,14 @@ table.grid.is-all-fields .sc-3 .cell-desc { width: 208px; min-width: 208px; max-
 
 .fd-toolbar { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; padding: 10px 12px; background: #fff; border: 1px solid var(--line); border-radius: 9px; }
 .fd-toolbar .fd-lbl { font-size: 12px; color: var(--subtle); font-weight: 600; margin-right: 4px; }
+.fd-preset-list { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.fd-preset-list .tool-btn { position: relative; touch-action: none; user-select: none; cursor: grab; }
+.fd-preset-grip { margin-right: 5px; color: var(--subtle); }
+.fd-preset-list .preset-dragging { opacity: .45; cursor: grabbing; }
+.fd-preset-list [data-preset-before]::before, .fd-preset-list [data-preset-after]::after { content: ""; position: absolute; top: -3px; bottom: -3px; width: 3px; background: var(--blue); border-radius: 2px; }
+.fd-preset-list [data-preset-before]::before { left: -5px; }
+.fd-preset-list [data-preset-after]::after { right: -5px; }
+.fd-preset-actions { margin-left: auto; display: flex; gap: 6px; }
 .fd-split { display: grid; grid-template-columns: minmax(340px, 1.05fr) minmax(360px, 1.25fr); gap: 14px; align-items: start; }
 .fd-pane { background: #fff; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; box-shadow: var(--shadow); }
 .fd-pane-hd { padding: 10px 13px; background: #f7fafd; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 750; color: var(--blue-deep); }
@@ -1146,7 +1154,7 @@ body:has(.basket-dock:not([hidden])) #toast {bottom:78px;}
 <header class="topbar">
   <div class="brand">
     <div class="brand-mark">MDM</div>
-    <div><strong>MDM 物料查询</strong><span>虚构数据 · 演示工作台</span></div>
+    <div><strong>MDM 物料查询</strong></div>
   </div>
   <div class="topbar-search-slot" id="topbarSearchSlot">
     <button type="button" class="tb-btn topbar-search-toggle" id="qDockOpen" aria-label="搜索物料" aria-controls="qSearchMain" aria-expanded="false"></button>

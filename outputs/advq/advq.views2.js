@@ -1063,8 +1063,10 @@ function renderFieldDrawer() {
     + '<div id="fdShortcutOptions"></div><div class="fd-shortcut-actions"><span id="fdShortcutStatus"></span><button class="tool-btn primary" data-act="save-shortcuts">保存快捷视图</button></div></details>'
     + '<div class="fd-toolbar">'
     + '<span class="fd-lbl">视图预设：</span>'
-    + mdmPresetNames().map((p) => '<button class="tool-btn" data-act="preset" data-v="' + esc(p) + '">' + esc(p) + "</button>").join("")
-    + '<span style="margin-left:auto;display:flex;gap:6px">'
+    + '<div id="fdPresetList" class="fd-preset-list" role="group" aria-label="视图预设，拖动调整顺序">'
+    + mdmPresetNames().map((p) => '<button type="button" class="tool-btn" data-act="preset" data-v="' + esc(p) + '" title="点击应用；拖动排序，或按 Alt + 左右方向键调整"><span class="fd-preset-grip" aria-hidden="true">⠿</span>' + esc(p) + "</button>").join("")
+    + '</div><span id="fdPresetSortStatus" class="sr-only" role="status"></span>'
+    + '<span class="fd-preset-actions">'
     + '<button class="tool-btn" data-act="fields-all">全选 (' + state.order.length + ')</button>'
     + '<button class="tool-btn" data-act="fields-none">仅留核心4列</button>'
     + "</span></div>";
