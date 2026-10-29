@@ -15,6 +15,7 @@ const cases=[
  ['AND',[group('OR',leaf('cat','eq','面巾'),group('AND',leaf('cat','eq','餐巾'),group('OR',leaf('pre','eq','Y'),leaf('pre','eq','X'))))],r=>r.cat==='面巾'||r.cat==='餐巾'&&(r.pre==='Y'||r.pre==='X')],
  ['AND',[leaf('desc','containsAny','面巾； 餐巾;不存在')],r=>r.desc.includes('面巾')||r.desc.includes('餐巾')],
  ['AND',[group('OR',leaf('material','prefix',codePrefix),leaf('cat','eq','面巾'))],r=>r.material.startsWith(codePrefix)||r.cat==='面巾'],
+ ['AND',[leaf('material','notPrefix',codePrefix)],r=>!r.material.startsWith(codePrefix)],
  ['AND',[group('OR'),group('AND',leaf('created','gte','202601'))],()=>true],
 ];
 for(const [logic,conditions,expected] of cases){
@@ -36,7 +37,13 @@ assert.equal(evalDpCondition(businessRow,leaf('brand','containsAny','品牌A；�
 assert.equal(evalDpCondition({brand:'品牌A'},leaf('brand','in','品牌A,品牌B')),true,'legacy membership keeps its behavior');
 assert.equal(filterConditionOperators('updated').some(o=>o.op==='prefix'),false,'date fields keep date-only choices');
 assert.equal(customConditionReady(leaf('material','prefix','')),false);
+for(const [value,prefix,expected] of [['VD001','vd',false],['XVD001','VD',true],['  VD001  ',' VD ',false],[null,'100',true],['ABC','',false],['ABC','   ',false],[0,0,false],['VD001','VD;XY',true],['[A].*物料','[A].*',false]]) {
+ assert.equal(evalDpCondition({desc:value},leaf('desc','notPrefix',prefix)),expected,'literal negative prefix: '+value+' / '+prefix);
+}
+assert.equal(filterConditionOperators('updated').some(o=>o.op==='notPrefix'),false);
+assert.equal(customConditionReady(leaf('material','notPrefix','')),false);
 state.filters.customConditions=[group('AND',group('OR',leaf('cat','eq','面巾'),leaf('updated','gte','20260101'),leaf('material','prefix',codePrefix)))];
+state.filters.customConditions.push(leaf('material','notPrefix','17'));
 assert.equal(customFilterNode('0.0.1').field,'updated');
 assert.equal(customFilterNode('0.0.9'),null);assert.equal(customFilterNode('0.__proto__'),null);
 assert.equal(customFilterChildren('0.0').length,3);
@@ -53,6 +60,8 @@ const html=renderCustomFilters();
 assert.ok(html.includes('data-idx="0.0.1"'));assert.ok(html.includes('打开条件 1.1.2 日期日历'));
 assert.ok(html.includes('包含任一项 (OR)'));assert.ok(html.includes('data-parent="0.0"'));
 assert.ok(html.includes('开头等于'));assert.ok(html.includes('等于任一项 (多项)'));assert.ok(html.includes('输入开头文本，如 100 或 VD'));
+assert.ok(html.includes('开头不等于'));assert.equal(state.filters.customConditions[1].op,'notPrefix');
+assert.equal(state.queryViews[0].context.filters.customConditions[1].op,'notPrefix');
 assert.equal(state.filters.customConditions[0].conditions[0].conditions[2].op,'prefix','prefix survives personal settings and saved-query round trips');
 for(const bad of [[{type:'group',logic:'XOR',conditions:[]}],[{type:'group',logic:'AND',conditions:'bad'}],[{type:'group',logic:'AND',conditions:[{}]}]])assert.throws(()=>validateCustomConditions(bad));
 let tooDeep=leaf('cat','eq','面巾');for(let i=0;i<9;i++)tooDeep=group('OR',tooDeep);

@@ -74,7 +74,7 @@ function analyzeSku(r) {
     else if (r.vconf) {
       const g = vconfByVcode.get(r.vcode);
       card("vcode", "warn", "冲突", "V 码 <b>" + esc(r.vcode) + "</b> 对应 " + (g ? g.materialCount : "多个") + " 个物料、"
-        + (g ? g.specCount : "多种") + " 种装数/规格组合（已剔除内部周转）："
+        + (g ? g.specCount : "多种") + " 种装数/规格组合（已剔除内部周转及预失效 X/F）："
         + (g ? '<div class="kv" style="margin-top:7px">' + g.specs.map((s) => "<dt>" + esc(s[0]) + "</dt><dd>装数 " + esc(fmt(s[1])) + " · 规格 " + esc(s[2] || "—") + "</dd>").join("") + "</div>" : "")
         + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:9px">'
         + '<button class="mini-btn primary" data-act="vconf-compare" data-vcode="' + esc(r.vcode) + '">' + ic("swap", 12) + " 一键对比该 V 码全部冲突 SKU</button>"
@@ -2020,7 +2020,7 @@ function renderRules() {
           + '<button class="tool-btn' + (state.filters.onlyVconf ? "" : "") + '" data-act="vconf-filter-all">' + ic("filter", 12) + (state.filters.onlyVconf ? " 已在结果中筛选 · 点击取消" : " 在查询结果中筛选冲突 SKU") + "</button>"
           + "</div>";
       }
-      return '<div class="rule-item"><div class="rt">' + ic("file-text", 13) + esc(r.title) + "</div><div class='rd'>" + esc(r.desc) + "</div>" + statHtml + "</div>";
+      return '<div class="rule-item"><div class="rt">' + ic("file-text", 13) + esc(r.title) + "</div><div class='rd'>" + esc(r.id === "vcode" ? VCONF_RULE_DESCRIPTION : r.desc) + "</div>" + statHtml + "</div>";
     }).join("");
   }
   document.getElementById("rulesList").innerHTML = h;
@@ -2199,16 +2199,16 @@ function renderMps() {
 /* ---------- 同V码冲突专属核查板块（按 V 码聚合展示多规格冲突组、一键加入对比篮对比、一键锁定查询） ---------- */
 function buildScopedVconfGroups() {
   /* 保留全量冲突判定作为依据，展示明细和导出严格限制在当前筛选范围。 */
-  const scoped = (derived.filtered || []).filter((r) => r.vconf && r.vcode);
+  const scoped = (derived.filtered || []).filter((r) => r.vconf && vconfEligible(r));
   const scopedByV = new Map();
   for (const r of scoped) {
     if (!scopedByV.has(r.vcode)) scopedByV.set(r.vcode, []);
     scopedByV.get(r.vcode).push(r);
   }
-  /* 同时建立全量非内部周转的同 V 码成员表，确保展开时能看到该 V 码下的所有冲突规格对手 */
+  /* 全量对手也沿用同一准入规则，排除内部周转和预失效 X/F。 */
   const allMembersByV = new Map();
   for (const r of rows) {
-    if (!r.vcode || String(r.npt || "").trim() === "内部周转") continue;
+    if (!vconfEligible(r)) continue;
     if (!scopedByV.has(r.vcode)) continue;
     if (!allMembersByV.has(r.vcode)) allMembersByV.set(r.vcode, []);
     allMembersByV.get(r.vcode).push(r);
@@ -2290,7 +2290,7 @@ function renderVconf() {
     + '<div class="mps-kpi"><div class="k-lb">当前范围冲突 V 码组数</div><div class="k-vl" style="color:var(--red)">' + filteredGroups.length.toLocaleString() + ' <small style="font-size:12px;color:var(--muted);font-weight:500">组</small></div><div class="k-sub">全局共 ' + (STATS.vconfGroups || 0).toLocaleString() + ' 组冲突 V 码</div></div>'
     + '<div class="mps-kpi"><div class="k-lb">涉及冲突 SKU 数</div><div class="k-vl" style="color:var(--orange)">' + totalSkus.toLocaleString() + ' <small style="font-size:12px;color:var(--muted);font-weight:500">个</small></div><div class="k-sub">全局共 ' + (STATS.vconf || 0).toLocaleString() + ' 个物料命中同 V 码冲突</div></div>'
     + '<div class="mps-kpi"><div class="k-lb">全量≥3 种规格的命中组</div><div class="k-vl" style="color:var(--purple)">' + multi3Plus.toLocaleString() + ' <small style="font-size:12px;color:var(--muted);font-weight:500">组</small></div><div class="k-sub">当前范围命中的 V 码，全量存在 3 种及以上规格</div></div>'
-    + '<div class="mps-kpi"><div class="k-lb">判定口径说明</div><div class="k-vl" style="font-size:13.5px;line-height:1.4;color:var(--blue-deep)">剔除「内部周转」<br>比对 原始装数 + 标准化规格</div><div class="k-sub">保留乘法因子顺序（1×10×6 = 10×6 ≠ 1×6×10）</div></div>'
+    + '<div class="mps-kpi"><div class="k-lb">判定口径说明</div><div class="k-vl" style="font-size:13.5px;line-height:1.4;color:var(--blue-deep)">剔除「内部周转」及预失效 X / F<br>比对 原始装数 + 标准化规格</div><div class="k-sub">保留乘法因子顺序（1×10×6 = 10×6 ≠ 1×6×10）</div></div>'
     + '</div>';
 
   /* 工具栏：V码/规格搜索 + 排序 + 全部展开明细 */

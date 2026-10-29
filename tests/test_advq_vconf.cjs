@@ -1,0 +1,31 @@
+// Old snapshots, counters, scoped detail, CSV and comparison must share the X/F exclusion.
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),path=require('node:path'),cp=require('node:child_process');
+const root=path.resolve(__dirname,'..');
+const dataset=JSON.parse(fs.readFileSync(path.join(root,'outputs/advq/dataset.json'),'utf8'));
+const fixture=JSON.parse(fs.readFileSync(path.join(root,'tests/fixtures/vcode-conflicts.json'),'utf8'));
+const expected=JSON.parse(cp.execFileSync('python3',['-c',"import json,sys;sys.path.insert(0,'scripts');from vcode_conflicts import rebuild_vcode_conflicts;rows=json.load(sys.stdin);groups=rebuild_vcode_conflicts(rows);print(json.dumps({'rows':rows,'groups':groups}))"],{cwd:root,input:JSON.stringify(fixture),encoding:'utf8'}));
+const ctx=vm.createContext({assert,dataset,fixture,expected,console,navigator:{},setTimeout:()=>0,clearTimeout:()=>{}});
+for(const name of ['core','config','views','views2','events'])vm.runInContext(fs.readFileSync(path.join(root,`outputs/advq/advq.${name}.js`),'utf8').replace(/init\(\);\s*$/,''),ctx);
+vm.runInContext(`
+DATASET={...dataset,rows:fixture.map(f=>{const r={status:'有效',desc:f.material,...f,vconf:1,issueCount:99};return dataset.schema.map(s=>r[s.key]??null);}),vconf:[{vcode:'STALE',materialCount:999}]};
+buildIndexes();applyUserSettings({v:8});computeStats();computeDerived();
+const same=(a,b,msg='same result')=>assert.equal(JSON.stringify(a),JSON.stringify(b),msg);
+same(rows.map(r=>({material:r.material,vconf:r.vconf,flags:r.flags,issueCount:r.issueCount})),expected.rows.map(r=>({material:r.material,vconf:r.vconf,flags:r.flags,issueCount:r.issueCount})),'browser and builder agree');
+same([...vconfByVcode.keys()],['TEST-V-B','TEST-V-E']);assert.equal(vconfByVcode.has('STALE'),false);
+assert.equal(STATS.vconf,4);assert.equal(STATS.vconfGroups,2);assert.equal(derived.stats.vconf,4);assert.equal(derived.stats.vconfGroups,2);
+const groups=buildScopedVconfGroups();same(groups.map(g=>g.vcode),['TEST-V-B','TEST-V-E']);same(groups.map(g=>g.fullMaterialCount),[2,2]);
+same(rows.filter(r=>r.vconf).map(r=>r.material),['TEST-04','TEST-05','TEST-13','TEST-14']);
+assert.equal(rows.find(r=>r.material==='TEST-01').flags,'NUM:层数','unrelated quality issue survives');
+state.filters.onlyVconf=true;computeDerived();assert.equal(derived.total,4);
+assert.ok(derived.filtered.every(vconfEligible));
+let exported;download=(name,content)=>{exported={name,content};};toast=()=>{};
+exportVconfCsv();for(const m of ['TEST-04','TEST-05','TEST-13','TEST-14'])assert.ok(exported.content.includes(m));
+for(const m of ['TEST-01','TEST-02','TEST-03','TEST-06','TEST-07','TEST-08','TEST-09','TEST-10','TEST-15'])assert.ok(!exported.content.includes(m));
+state.filters.pre='Y';computeDerived();const scoped=buildScopedVconfGroups();assert.equal(scoped.length,1);assert.equal(scoped[0].materialCount,1);assert.equal(scoped[0].fullMaterialCount,2,'narrow filters keep a genuine global conflict');
+state.filters.pre='X';computeDerived();assert.equal(derived.total,0);assert.equal(buildScopedVconfGroups().length,0);
+state.filters.pre='';state.filters.onlyVconf=false;computeDerived();
+ensureVconfColumns=()=>{};openDrawer=()=>{};refreshAll=()=>{};
+const compare={dataset:{act:'vconf-compare',vcode:'TEST-V-B'},closest:()=>null};onClick({target:{closest:()=>compare}});same(state.basket,['TEST-04','TEST-05'],'one-click comparison excludes X/F and internal turnover');
+const first=JSON.stringify(rows.map(r=>[r.flags,r.issueCount,r.vconf]));buildIndexes();same(JSON.stringify(rows.map(r=>[r.flags,r.issueCount,r.vconf])),first,'reloading does not duplicate flags');
+console.log('PASS: X/F exclusion before grouping, stale snapshot repair, Python/browser parity, counters, flags, scoped export and comparison.');
+`,ctx);

@@ -25,6 +25,7 @@ class ConfigStoreTests(unittest.TestCase):
             {"field": "desc", "op": "containsAny", "val": "面巾；餐巾"},
             {"type": "group", "logic": "AND", "conditions": [
                 {"field": "material", "op": "prefix", "val": "100"},
+                {"field": "material", "op": "notPrefix", "val": "17"},
                 {"field": "created", "op": "gte", "val": "20260101"}]}]}]
         doc["settings"]["filters"] = {"customLogic": "AND", "customConditions": tree}
         self.store.save(doc)

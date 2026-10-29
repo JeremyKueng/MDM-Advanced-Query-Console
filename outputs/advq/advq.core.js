@@ -87,7 +87,7 @@ const ANALYSES = [
   { id: "numeric",      name: "明显错值",         icon: "hash",     gov: "numeric",      desc: "净重、成品定量、层数、原始装数 ≤0 检测" },
   { id: "box",          name: "盒巾/纸盒尺寸口径", icon: "ruler",    gov: "adjudication", desc: "面巾软抽/盒巾取数口径与匹配校验" },
   { id: "packaging",    name: "包装层级与成对校验", icon: "layers",   gov: "packaging",    desc: "包装数组层级、单位数量成对、中包证据对齐" },
-  { id: "vcode",        name: "同V码规格一致性",  icon: "link",     gov: "packaging",    desc: "同V码多规格冲突（剔除内部周转）" },
+  { id: "vcode",        name: "同V码规格一致性",  icon: "link",     gov: "packaging",    desc: "同V码多规格冲突（剔除内部周转及预失效 X/F）" },
   { id: "spec",         name: "装数与规格乘积",   icon: "calc",     gov: "packaging",    desc: "原始装数与物料规格乘积表达式比对" },
   { id: "pdfrules",     name: "工艺属性自动检查", icon: "clipboard", gov: "numeric",     desc: "示例校验规范 11 类规则：电商/重量三件套/成品定量/不含液净重/节距卷高/卷类名称/纸长纸宽/FSC/抽张片数/小卷包净重/pian" },
   { id: "route",        name: "MPS 工艺路线完整度", icon: "route",  gov: "route",        desc: "每次按新 MDM 源表实时推导机头/裁切/小包/中包/装箱节点" },
@@ -202,6 +202,7 @@ const DP_OPERATORS = [
   { op: "eq",         label: "等于 (=)" },
   { op: "neq",        label: "不等于 (≠)" },
   { op: "prefix",     label: "开头等于" },
+  { op: "notPrefix",  label: "开头不等于" },
   { op: "contains",   label: "包含" },
   { op: "notContains",label: "不包含" },
   { op: "in",         label: "等于任一项 (多项)" },
@@ -245,7 +246,7 @@ function customConditionReady(c) {
 }
 function customConditionValueLabel(c) { return c.op === "between" ? c.val + " 至 " + c.valTo : c.val; }
 function conditionValuePlaceholder(op) {
-  return { prefix: "输入开头文本，如 100 或 VD", in: "完整值，多项用逗号分隔", containsAny: "如：面巾；餐巾（任一项匹配）" }[op] || "输入匹配值";
+  return { prefix: "输入开头文本，如 100 或 VD", notPrefix: "输入要排除的开头，如 17 或 VD", in: "完整值，多项用逗号分隔", containsAny: "如：面巾；餐巾（任一项匹配）" }[op] || "输入匹配值";
 }
 function mdmPresetNames() {
   const names = Object.keys(DATASET.presets).filter((name) => name !== "工艺属性检查");
@@ -482,6 +483,7 @@ function evalDpCondition(r, cond) {
     case "eq": return sv.toLowerCase() === target.toLowerCase();
     case "neq": return sv.toLowerCase() !== target.toLowerCase();
     case "prefix": return target !== "" && sv.toLowerCase().startsWith(target.toLowerCase());
+    case "notPrefix": return target !== "" && !sv.toLowerCase().startsWith(target.toLowerCase());
     case "contains": return target !== "" && sv.toLowerCase().includes(target.toLowerCase());
     case "containsAny": return splitCustomValues(target).some((value) => sv.toLowerCase().includes(value));
     case "notContains": return target === "" || !sv.toLowerCase().includes(target.toLowerCase());
@@ -699,21 +701,42 @@ async function loadDataset() {
   return JSON.parse(text);
 }
 
+const VCONF_RULE_DESCRIPTION = "剔除新品类型=内部周转及预失效=X、F后，以原始装数 + 物料规格乘积表达式识别同V码多规格；保留乘法因子顺序，1×10×6 与 10×6 等同、1×6×10 不同。";
+function vconfEligible(row) {
+  return !!String(row.vcode || "").trim() && String(row.npt || "").trim() !== "内部周转" && !["X", "F"].includes(String(row.pre || "").trim().toUpperCase());
+}
+function rebuildVconfIndex() {
+  const groups = new Map(); vconfByVcode.clear();
+  for (const row of rows) {
+    row.vconf = 0; row._flags = row._flags.filter((flag) => flag !== "VCONF");
+    if (!vconfEligible(row)) continue;
+    if (!groups.has(row.vcode)) groups.set(row.vcode, []);
+    groups.get(row.vcode).push(row);
+  }
+  for (const [vcode, members] of groups) {
+    const signatures = new Set(members.map((row) => JSON.stringify([row.load ?? null, row.specC || ""])));
+    if (signatures.size < 2) continue;
+    members.forEach((row) => { row.vconf = 1; row._flags.push("VCONF"); });
+    vconfByVcode.set(vcode, { vcode, materialCount: members.length, specCount: signatures.size,
+      specs: members.slice(0, 8).map((row) => [row.material, row.load, row.specC || "", String(row.desc || "").slice(0, 40)]) });
+  }
+  for (const row of rows) { row.flags = row._flags.join("|"); row.issueCount = row._flags.length; }
+}
 function buildIndexes() {
   const ds = DATASET;
   schemaKeys = ds.schema.map((s) => s.key);
   ds.schema.forEach((s) => schemaByKey.set(s.key, s));
   ds.gov.forEach((g) => { GOV_META[g.id] = g; });
-  ds.vconf.forEach((g) => vconfByVcode.set(g.vcode, g));
   Object.entries(ds.routeIssues || {}).forEach(([m, list]) => routeIssueMap.set(m, list));
   rows = ds.rows.map((r) => {
     const o = {};
     for (let i = 0; i < schemaKeys.length; i++) o[schemaKeys[i]] = r[i];
     o._flags = o.flags ? String(o.flags).split("|") : [];
-    o._st = searchTextOf(o);
     return o;
   });
-  rows.forEach((r) => byMaterial.set(r.material, r));
+  // 旧版已导入快照也按当前规则重算，不沿用包含预失效 X/F 的冲突标记。
+  rebuildVconfIndex();
+  rows.forEach((r) => { r._st = searchTextOf(r); byMaterial.set(r.material, r); });
   lookupCodes = new Set(rows.flatMap((r) => [r.material, r.vcode]).filter(Boolean).map((v) => String(v).trim().toLowerCase()));
 }
 function searchTextOf(o) {

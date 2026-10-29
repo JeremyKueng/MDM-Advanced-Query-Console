@@ -1455,8 +1455,8 @@ function onClick(e) {
     case "vconf-compare": {
       const vc = (el.dataset.vcode || v || "").trim();
       if (!vc) break;
-      const members = derived.filtered.filter((r) => r.vcode === vc && String(r.npt || "").trim() !== "内部周转");
-      if (members.length < 2) { toast("该 V 码下可对比的非内部周转物料不足 2 个", true); break; }
+      const members = derived.filtered.filter((r) => r.vcode === vc && r.vconf && vconfEligible(r));
+      if (members.length < 2) { toast("该 V 码下符合冲突核查范围的物料不足 2 个", true); break; }
       const byVar = new Map();
       for (const m of members) {
         const vk = String(m.load == null ? "" : m.load) + "||" + String(m.specC || "");
@@ -2625,7 +2625,7 @@ function computeStats() {
     blocking,
     withIssues,
     vconf,
-    vconfGroups: (DATASET.vconf && DATASET.vconf.length) || vconfVcodes.size,
+    vconfGroups: vconfVcodes.size,
     routeCovered,
     pdfHits,
     pdfBlock,

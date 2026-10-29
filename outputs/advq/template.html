@@ -1094,7 +1094,8 @@ body:has(.basket-dock:not([hidden])) #toast {bottom:78px;}
 .column-sort-actions {display:flex;gap:8px;padding:10px 12px 4px;}
 .column-sort-actions button {flex:1;white-space:nowrap;}
 .column-sort-actions [aria-pressed=true] {background:var(--blue-soft);color:var(--blue);border-color:#a5c9fc;}
-.column-filter-menu .column-clear {margin:5px 12px 9px;border:0;display:flex;align-items:center;gap:7px;text-align:left;}
+.column-secondary-actions {display:flex;gap:8px;padding:0 12px 8px;flex:none;}
+.column-filter-menu .column-clear {flex:1;min-width:0;min-height:28px;margin:0;padding:4px 0;border:0;display:flex;align-items:center;justify-content:center;gap:5px;font-size:12px;line-height:1.4;white-space:nowrap;}
 .column-filter-content {padding:0 12px 8px;overflow:auto;min-height:0;}
 .column-filter-content>input {width:100%;border:1px solid #bfd2eb;border-radius:7px;padding:9px 10px;font:inherit;}
 .column-selection {display:flex;align-items:center;justify-content:space-between;padding:9px 0;gap:8px;}
@@ -1235,7 +1236,7 @@ body:has(.basket-dock:not([hidden])) #toast {bottom:78px;}
   <section class="sec tabpanel" id="panel-vconf">
     <div class="sec-head">
       <h2 id="vconfTitle"></h2>
-      <span class="sub" id="vconfSub">以精确 V 码分组（剔除内部周转），核对同一 V 码下出现多种「原始装数 + 标准化物料规格乘积表达式」的冲突组</span>
+      <span class="sub" id="vconfSub">以精确 V 码分组（剔除内部周转及预失效 X/F），核对同一 V 码下出现多种「原始装数 + 标准化物料规格乘积表达式」的冲突组</span>
       <div class="right">
         <button class="tool-btn" data-act="vconf-filter-all"></button>
         <button class="tool-btn primary" data-act="export-vconf-csv"></button>

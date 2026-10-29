@@ -1,0 +1,17 @@
+[
+  {"material":"TEST-01","vcode":"TEST-V-A","pre":"Y","npt":"常规","load":12,"specC":"3×4","flags":"NUM:层数|VCONF"},
+  {"material":"TEST-02","vcode":"TEST-V-A","pre":"X","load":24,"specC":"3×8","flags":"VCONF"},
+  {"material":"TEST-03","vcode":"TEST-V-A","pre":"F","load":36,"specC":"3×12","flags":"VCONF"},
+  {"material":"TEST-04","vcode":"TEST-V-B","pre":"Y","load":12,"specC":"3×4","flags":"VCONF"},
+  {"material":"TEST-05","vcode":"TEST-V-B","pre":"N","load":24,"specC":"3×8","flags":"VCONF"},
+  {"material":"TEST-06","vcode":"TEST-V-B","pre":" x ","load":48,"specC":"3×16","flags":"MISS:品牌|VCONF"},
+  {"material":"TEST-07","vcode":"TEST-V-B","pre":"f","load":60,"specC":"3×20","flags":"VCONF"},
+  {"material":"TEST-08","vcode":"TEST-V-B","pre":"Y","npt":"内部周转","load":72,"specC":"3×24","flags":"VCONF"},
+  {"material":"TEST-09","vcode":"TEST-V-C","pre":"X","load":12,"specC":"3×4","flags":"VCONF"},
+  {"material":"TEST-10","vcode":"TEST-V-C","pre":"F","load":24,"specC":"3×8","flags":"VCONF"},
+  {"material":"TEST-11","vcode":"TEST-V-D","pre":"","load":12,"specC":"3×4","flags":""},
+  {"material":"TEST-12","vcode":"TEST-V-D","pre":null,"load":12,"specC":"3×4","flags":""},
+  {"material":"TEST-13","vcode":"TEST-V-E","pre":"","load":12,"specC":"3×4","flags":""},
+  {"material":"TEST-14","vcode":"TEST-V-E","pre":null,"load":24,"specC":"3×8","flags":""},
+  {"material":"TEST-15","vcode":"","pre":"Y","load":12,"specC":"3×4","flags":"VCONF"}
+]

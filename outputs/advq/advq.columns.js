@@ -87,8 +87,8 @@ function openColumnFilterMenu(trigger) {
   const desc = number ? '从大到小' : date ? '从晚到早' : '降序 Z → A';
   element.innerHTML = '<header><strong>' + esc(schema.label) + '</strong><button type="button" data-column-action="cancel" aria-label="关闭表头筛选">' + ic('x', 15) + '</button></header>'
     + '<div class="column-sort-actions"><button type="button" data-column-action="asc" aria-pressed="' + (state.sort.key === key && state.sort.dir === 1) + '">↑ ' + asc + '</button><button type="button" data-column-action="desc" aria-pressed="' + (state.sort.key === key && state.sort.dir === -1) + '">↓ ' + desc + '</button></div>'
-    + '<button type="button" class="column-clear" data-column-action="clear"' + (!active ? ' disabled' : '') + '>' + ic('filter', 13) + ' 清除此列筛选</button>'
-    + '<button type="button" class="column-clear" data-column-action="reset-sort"' + (!state.sort.explicit ? ' disabled' : '') + '>↺ 恢复默认排序</button>'
+    + '<div class="column-secondary-actions"><button type="button" class="column-clear" data-column-action="clear"' + (!active ? ' disabled' : '') + '>' + ic('filter', 13) + ' 清除此列筛选</button>'
+    + '<button type="button" class="column-clear" data-column-action="reset-sort"' + (!state.sort.explicit ? ' disabled' : '') + '>↺ 恢复默认排序</button></div>'
     + '<div class="column-filter-content"><input type="search" data-column-search placeholder="搜索此列的值…" aria-label="搜索' + esc(schema.label) + '的值" autocomplete="off">'
     + '<div class="column-selection"><label><input type="checkbox" data-column-select-all> 全选匹配值</label><button type="button" data-column-action="invert">反选</button></div>'
     + '<div class="column-values" data-column-values></div><button type="button" class="column-more" data-column-action="more" hidden></button>'

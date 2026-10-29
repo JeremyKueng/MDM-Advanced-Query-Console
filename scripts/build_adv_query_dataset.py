@@ -24,6 +24,7 @@ SCRIPTS = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS))
 import build_mdm_snapshot as bms  # noqa: E402  复用既有口径实现
 import process_rules as pr
+import vcode_conflicts as vc
 DEFAULT_PROCESS_RUN = pr.compile_config(pr.validate(pr.defaults()))
 import mps_route_engine as mre    # noqa: E402  MPS 工艺路线实时重算引擎
 
@@ -986,27 +987,8 @@ def main(argv=None) -> dict:
         records.append({"material": material, "values": values, "raw_npt": str(raw.get("新品类型") or ""),
                         "pdf_rule_hits": pdf_rule_hits, "pdf_block_hits": pdf_block_hits})
 
-    # ---- 同V码冲突（剔除内部周转；比 原始装数+规格标准化）----
-    by_vcode: dict[str, list[dict]] = defaultdict(list)
-    for rec in records:
-        v = rec["values"]["vcode"]
-        if v and rec["raw_npt"] != "内部周转":
-            by_vcode[v].append(rec)
-    vconf_groups = []
-    for v, members in by_vcode.items():
-        keys = {(m["values"]["load"], m["values"]["specC"]) for m in members}
-        if len(members) > 1 and len(keys) > 1:
-            for m in members:
-                m["values"]["vconf"] = 1
-                m["values"]["flags"] = (m["values"]["flags"] + "|VCONF").strip("|")
-                m["values"]["issueCount"] = len(m["values"]["flags"].split("|")) if m["values"]["flags"] else 0
-            vconf_groups.append({
-                "vcode": v,
-                "materialCount": len(members),
-                "specCount": len(keys),
-                "specs": [[m["values"]["material"], m["values"]["load"], m["values"]["specC"], m["values"]["desc"][:40]] for m in members[:8]],
-            })
-    vconf_groups.sort(key=lambda g: -g["materialCount"])
+    # ---- 同V码冲突（先剔除内部周转及预失效 X/F，再比原始装数+规格）----
+    vconf_groups = vc.rebuild_vcode_conflicts([rec["values"] for rec in records])
     print(f"同V码冲突组：{len(vconf_groups)}")
 
     # ---- 组装 schema（从『物料属性查询报表-成品（含工艺）』123 个表头列全量初始化 + 质量/MPS计算字段）----
@@ -1099,7 +1081,7 @@ def main(argv=None) -> dict:
         {"id": "numeric", "title": "明显错值", "desc": "净重、毛重、成品定量、层数、原始装数等数值字段不得小于等于 0。"},
         {"id": "box", "title": "盒巾/纸盒尺寸口径", "desc": "面巾以纸盒尺寸区分软抽与盒巾：纸盒尺寸为空或“无”即软抽（取小包长宽高），维护了有效纸盒尺寸即盒巾（长宽直接取纸盒尺寸长/宽，无法解析进入待确认）。"},
         {"id": "packaging", "title": "包装层级与成对校验", "desc": "包装规格只做两类判断：同层级单位与数量成对维护；链条与主单位、中包包装方式、面巾小包证据对齐。"},
-        {"id": "vcode", "title": "同V码规格一致性", "desc": "剔除新品类型=内部周转后，以原始装数 + 物料规格乘积表达式识别同V码多规格；保留乘法因子顺序，1×10×6 与 10×6 等同、1×6×10 不同。"},
+        {"id": "vcode", "title": "同V码规格一致性", "desc": vc.RULE_DESCRIPTION},
         {"id": "route", "title": "MPS 工艺路线实时推导（独立板块）", "desc": "面巾/卫卷/纸巾/餐巾按 V2.3.2 规则每次基于当前 MDM 源表实时重算工艺路线、节点状态与包装数组交叉校验；问题归入独立「MPS 工艺路线」板块，不混入全局 MDM 阻断与异常数。"},
     ]
     for r in rules:
