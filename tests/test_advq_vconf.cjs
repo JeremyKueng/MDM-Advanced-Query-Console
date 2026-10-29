@@ -21,7 +21,7 @@ assert.ok(derived.filtered.every(vconfEligible));
 let exported;download=(name,content)=>{exported={name,content};};toast=()=>{};
 exportVconfCsv();for(const m of ['TEST-04','TEST-05','TEST-13','TEST-14'])assert.ok(exported.content.includes(m));
 for(const m of ['TEST-01','TEST-02','TEST-03','TEST-06','TEST-07','TEST-08','TEST-09','TEST-10','TEST-15'])assert.ok(!exported.content.includes(m));
-state.filters.pre='Y';computeDerived();const scoped=buildScopedVconfGroups();assert.equal(scoped.length,1);assert.equal(scoped[0].materialCount,1);assert.equal(scoped[0].fullMaterialCount,2,'narrow filters keep a genuine global conflict');
+state.filters.pre='Y';computeDerived();const scoped=buildScopedVconfGroups();assert.equal(scoped.length,0,'a single remaining specification is not a conflict');
 state.filters.pre='X';computeDerived();assert.equal(derived.total,0);assert.equal(buildScopedVconfGroups().length,0);
 state.filters.pre='';state.filters.onlyVconf=false;computeDerived();
 ensureVconfColumns=()=>{};openDrawer=()=>{};refreshAll=()=>{};

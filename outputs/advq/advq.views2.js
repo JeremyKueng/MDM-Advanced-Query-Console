@@ -2198,24 +2198,16 @@ function renderMps() {
 
 /* ---------- 同V码冲突专属核查板块（按 V 码聚合展示多规格冲突组、一键加入对比篮对比、一键锁定查询） ---------- */
 function buildScopedVconfGroups() {
-  /* 保留全量冲突判定作为依据，展示明细和导出严格限制在当前筛选范围。 */
+  /* 冲突由当前筛选范围内的物料判定。 */
   const scoped = (derived.filtered || []).filter((r) => r.vconf && vconfEligible(r));
   const scopedByV = new Map();
   for (const r of scoped) {
     if (!scopedByV.has(r.vcode)) scopedByV.set(r.vcode, []);
     scopedByV.get(r.vcode).push(r);
   }
-  /* 全量对手也沿用同一准入规则，排除内部周转和预失效 X/F。 */
-  const allMembersByV = new Map();
-  for (const r of rows) {
-    if (!vconfEligible(r)) continue;
-    if (!scopedByV.has(r.vcode)) continue;
-    if (!allMembersByV.has(r.vcode)) allMembersByV.set(r.vcode, []);
-    allMembersByV.get(r.vcode).push(r);
-  }
   const groups = [];
   for (const [vcode, scopedList] of scopedByV.entries()) {
-    const allMembers = allMembersByV.get(vcode) || scopedList;
+    const allMembers = scopedList;
     const members = scopedList;
     const varMap = new Map();
     for (const m of members) {
@@ -2289,7 +2281,7 @@ function renderVconf() {
   let h = renderScopeLinkageBar("同V码冲突") + '<div class="mps-kpi-grid">'
     + '<div class="mps-kpi"><div class="k-lb">当前范围冲突 V 码组数</div><div class="k-vl" style="color:var(--red)">' + filteredGroups.length.toLocaleString() + ' <small style="font-size:12px;color:var(--muted);font-weight:500">组</small></div><div class="k-sub">全局共 ' + (STATS.vconfGroups || 0).toLocaleString() + ' 组冲突 V 码</div></div>'
     + '<div class="mps-kpi"><div class="k-lb">涉及冲突 SKU 数</div><div class="k-vl" style="color:var(--orange)">' + totalSkus.toLocaleString() + ' <small style="font-size:12px;color:var(--muted);font-weight:500">个</small></div><div class="k-sub">全局共 ' + (STATS.vconf || 0).toLocaleString() + ' 个物料命中同 V 码冲突</div></div>'
-    + '<div class="mps-kpi"><div class="k-lb">全量≥3 种规格的命中组</div><div class="k-vl" style="color:var(--purple)">' + multi3Plus.toLocaleString() + ' <small style="font-size:12px;color:var(--muted);font-weight:500">组</small></div><div class="k-sub">当前范围命中的 V 码，全量存在 3 种及以上规格</div></div>'
+    + '<div class="mps-kpi"><div class="k-lb">当前范围≥3 种规格的命中组</div><div class="k-vl" style="color:var(--purple)">' + multi3Plus.toLocaleString() + ' <small style="font-size:12px;color:var(--muted);font-weight:500">组</small></div><div class="k-sub">当前筛选范围内存在 3 种及以上规格</div></div>'
     + '<div class="mps-kpi"><div class="k-lb">判定口径说明</div><div class="k-vl" style="font-size:13.5px;line-height:1.4;color:var(--blue-deep)">剔除「内部周转」及预失效 X / F<br>比对 原始装数 + 标准化规格</div><div class="k-sub">保留乘法因子顺序（1×10×6 = 10×6 ≠ 1×6×10）</div></div>'
     + '</div>';
 
@@ -2330,7 +2322,7 @@ function renderVconf() {
       + '<div class="vconf-card-hd">'
       + '<span class="vc-code">' + ic("link", 13) + ' ' + esc(g.vcode) + '</span>'
       + '<span class="tag red">当前范围 <b>' + g.specCount + '</b> 种规格 / <b>' + g.materialCount + '</b> 个物料</span>'
-      + '<span class="tag orange">全量冲突依据：' + g.fullSpecCount + ' 种规格 / ' + g.fullMaterialCount + ' 个物料</span>'
+      + '<span class="tag orange">当前范围冲突依据：' + g.fullSpecCount + ' 种规格 / ' + g.fullMaterialCount + ' 个物料</span>'
       + (g.cats.length ? '<span class="tag blue">' + esc(g.cats.join(" / ")) + '</span>' : '')
       + (g.brands.length ? '<span class="tag">' + esc(g.brands.join(" / ")) + '</span>' : '')
       + '<div class="vc-acts">'

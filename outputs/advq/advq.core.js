@@ -705,10 +705,12 @@ const VCONF_RULE_DESCRIPTION = "剔除新品类型=内部周转及预失效=X、
 function vconfEligible(row) {
   return !!String(row.vcode || "").trim() && String(row.npt || "").trim() !== "内部周转" && !["X", "F"].includes(String(row.pre || "").trim().toUpperCase());
 }
-function rebuildVconfIndex() {
+function rebuildVconfIndex(scope = rows) {
   const groups = new Map(); vconfByVcode.clear();
   for (const row of rows) {
     row.vconf = 0; row._flags = row._flags.filter((flag) => flag !== "VCONF");
+  }
+  for (const row of scope) {
     if (!vconfEligible(row)) continue;
     if (!groups.has(row.vcode)) groups.set(row.vcode, []);
     groups.get(row.vcode).push(row);
@@ -1017,10 +1019,14 @@ function computeScopedRuleStats(records) {
 }
 
 function computeDerived() {
+  rebuildVconfIndex();
   state._qSpec = parseQuerySpec(state.q, state.qMode, state.qField);
   state.tokens = state._qSpec.tokens || [];
   prepareCustomFilterMatches();
   state._columnTests = Object.entries(normalizeColumnFilters(state.filters.columnFilters)).map(([key, values]) => [key, new Set(values)]);
+  // 排除冲突自身筛选，先确定查询范围，再在范围内判定冲突，避免循环依赖。
+  const scope = rows.filter((r) => passFilters(r, new Set(["onlyVconf"])));
+  rebuildVconfIndex(scope);
   const out = [];
   for (const r of rows) if (passFilters(r, NO_SKIP)) out.push(r);
   const key = state.sort.key, dir = state.sort.dir;
