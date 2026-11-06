@@ -1065,7 +1065,7 @@ def main(argv=None) -> dict:
     # 治理归口实时计数（全局仅统计 MDM 质量与工艺属性标记，MPS 路线专项单列在 MPS 板块）
     FLAG_GOV = {
         "MISS": "supplement", "NUM": "numeric", "BOX": "adjudication", "PAIR": "numeric",
-        "LEVEL": "packaging", "VCONF": "packaging", "SPEC": "packaging",
+        "LEVEL": "packaging", "VCONF": "packaging", "VREVIEW": "packaging", "SPEC": "packaging",
         "PFM": "supplement", "PFN": "numeric", "PFC": "numeric", "PFI": "supplement", "PFP": "packaging",
     }
     gov_counts = {g["id"]: 0 for g in bms.GOVERNANCE_META}

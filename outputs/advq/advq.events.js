@@ -75,24 +75,25 @@ function exportMpsCsv() {
   download("MPS工艺路线实时重算清单-" + scoped.length + "条-" + stamp() + ".csv", "\uFEFF" + lines.join("\r\n"), "text/csv;charset=utf-8");
   toast("已导出 MPS 工艺路线清单 " + scoped.length.toLocaleString() + " 条");
 }
+function vconfExportTable() {
+  const groups = filteredVconfGroups();
+  const headers = ["冲突V码", "冲突类型", "核查状态", "同V码冲突规格种数", "同V码涉及物料数", "物料编码", "物料状态", "品类三级", "品牌", "原始装数", "MDM物料规格", "标准化规格(保留乘法顺序)", "规格乘积", "主计量单位", "包装层级规格", "物料说明", "说明中识别的装数", "判断依据"];
+  const values = groups.map((g) => g.members.map((m) => [g.vcode, g.conflictType, g.reviewStatus, g.specCount, g.materialCount,
+    String(m.material), m.status || "", m.cat || "", m.brand || "", m.load ?? null, m.spec || "", m.specC || "",
+    m.specP ?? null, m.unit || "", m.pack || "", m.desc || "", g.descriptionSpecs[m.material] || "", g.reviewReason]));
+  return { groups, headers, values, rowCount: values.reduce((n, group) => n + group.length, 0) };
+}
 function exportVconfCsv() {
-  const groups = typeof buildScopedVconfGroups === "function" ? buildScopedVconfGroups() : [];
-  if (!groups.length) { toast("当前筛选范围内没有同 V 码规格冲突数据", true); return; }
-  const headers = ["冲突V码", "同V码冲突规格种数", "同V码涉及物料数", "物料编码", "物料状态", "品类三级", "品牌", "原始装数", "MDM物料规格", "标准化规格(保留乘法顺序)", "规格乘积", "主计量单位", "包装层级规格", "物料说明"];
-  const lines = [headers.map(csvCell).join(",")];
-  let rowCnt = 0;
-  for (const g of groups) {
-    for (const m of g.members) {
-      rowCnt++;
-      lines.push([
-        g.vcode, g.specCount, g.materialCount, m.material, m.status || "",
-        m.cat || "", m.brand || "", fmt(m.load), m.spec || "", m.specC || "",
-        fmt(m.specP), m.unit || "", m.pack || "", m.desc || "",
-      ].map(csvCell).join(","));
-    }
-  }
-  download("MDM同V码规格冲突核查清单-" + groups.length + "组-" + rowCnt + "条-" + stamp() + ".csv", "\uFEFF" + lines.join("\r\n"), "text/csv;charset=utf-8");
-  toast("已导出同 V 码冲突清单：" + groups.length.toLocaleString() + " 组 / " + rowCnt.toLocaleString() + " 条物料");
+  const data = vconfExportTable();
+  if (!data.groups.length) { toast("当前筛选范围内没有同 V 码核查数据", true); return; }
+  download("MDM同V码核查清单-" + stamp() + ".csv", "\uFEFF" + [data.headers, ...data.values.flat()].map((r) => r.map(csvCell).join(",")).join("\r\n"), "text/csv;charset=utf-8");
+}
+function exportVconfXlsx() {
+  const data = vconfExportTable();
+  if (!data.groups.length) { toast("当前筛选范围内没有同 V 码核查数据", true); return; }
+  const bytes = groupedListXlsx(data.headers, data.values, [16,22,12,14,14,20,12,16,14,12,20,22,12,12,28,64,24,80]);
+  download("MDM同V码核查清单-" + data.groups.length + "组-" + data.rowCount + "条-" + stamp() + ".xlsx", bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  toast("已导出同 V 码核查清单：" + data.groups.length.toLocaleString() + " 组 / " + data.rowCount.toLocaleString() + " 条，按 V 码交替着色");
 }
 function exportFocusCsv() {
   const scopedRows = derived.filtered || [];
@@ -1526,6 +1527,11 @@ function onClick(e) {
       state.vconfFilter.page = 1;
       renderVconf();
       break;
+    case "vconf-status":
+      state.vconfFilter.status = ["规格冲突", "待确认"].includes(v) ? v : "";
+      state.vconfFilter.page = 1;
+      renderVconf();
+      break;
     case "vconf-clear-q":
       state.vconfFilter.q = "";
       state.vconfFilter.page = 1;
@@ -1541,6 +1547,9 @@ function onClick(e) {
       break;
     case "export-vconf-csv":
       exportVconfCsv();
+      break;
+    case "export-vconf-xlsx":
+      exportVconfXlsx();
       break;
     case "process-check-scope": state.processCheckFilter.onlyIssue = v !== "all"; state.processCheckFilter.page = 1; renderProcessChecks(); break;
     case "process-check-page": state.processCheckFilter.page = Math.max(1, parseInt(v, 10) || 1); renderProcessChecks(); break;

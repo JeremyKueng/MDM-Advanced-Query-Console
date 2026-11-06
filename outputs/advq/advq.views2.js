@@ -73,8 +73,9 @@ function analyzeSku(r) {
     if (!r.vcode) card("vcode", "na", "无V码", "该物料未维护 V 码，不参与同 V 码冲突分组。");
     else if (r.vconf) {
       const g = vconfByVcode.get(r.vcode);
-      card("vcode", "warn", "冲突", "V 码 <b>" + esc(r.vcode) + "</b> 对应 " + (g ? g.materialCount : "多个") + " 个物料、"
+      card("vcode", "warn", g ? g.reviewStatus : "规格冲突", "V 码 <b>" + esc(r.vcode) + "</b> 对应 " + (g ? g.materialCount : "多个") + " 个物料、"
         + (g ? g.specCount : "多种") + " 种装数/规格组合（已剔除内部周转及预失效 X/F）："
+        + (g ? '<p>' + esc(g.conflictType + " · " + g.reviewReason) + '</p>' : '')
         + (g ? '<div class="kv" style="margin-top:7px">' + g.specs.map((s) => "<dt>" + esc(s[0]) + "</dt><dd>装数 " + esc(fmt(s[1])) + " · 规格 " + esc(s[2] || "—") + "</dd>").join("") + "</div>" : "")
         + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:9px">'
         + '<button class="mini-btn primary" data-act="vconf-compare" data-vcode="' + esc(r.vcode) + '">' + ic("swap", 12) + " 一键对比该 V 码全部冲突 SKU</button>"
@@ -2232,6 +2233,7 @@ function buildScopedVconfGroups() {
     const cats = [...new Set(members.map((x) => x.cat).filter(Boolean))];
     const brands = [...new Set(members.map((x) => x.brand).filter(Boolean))];
     groups.push({
+      ...(vconfByVcode.get(vcode) || classifyVconf(members)),
       vcode,
       scopedCount: scopedList.length,
       materialCount: members.length,
@@ -2247,14 +2249,13 @@ function buildScopedVconfGroups() {
   return groups;
 }
 
-function renderVconf() {
-  const el = document.getElementById("vconfBody");
-  if (!el) return;
-  const vf = state.vconfFilter || { q: "", sort: "materials", expandAll: false, page: 1 };
+function filteredVconfGroups() {
+  const vf = state.vconfFilter || {};
   const allGroups = buildScopedVconfGroups();
   const q = (vf.q || "").trim().toLowerCase();
 
   let filteredGroups = allGroups.filter((g) => {
+    if (vf.status && g.reviewStatus !== vf.status) return false;
     if (!q) return true;
     if (g.vcode.toLowerCase().includes(q)) return true;
     return g.members.some((m) =>
@@ -2270,20 +2271,29 @@ function renderVconf() {
   if (vf.sort === "specs") {
     filteredGroups.sort((a, b) => b.specCount - a.specCount || b.materialCount - a.materialCount || a.vcode.localeCompare(b.vcode));
   } else if (vf.sort === "vcode") {
-    filteredGroups.sort((a, b) => a.vcode.localeCompare(b.vcode, "zh-Hans-CN"));
+    filteredGroups.sort((a, b) => a.vcode.localeCompare(b.vcode, "zh-CN"));
   } else {
     filteredGroups.sort((a, b) => b.materialCount - a.materialCount || b.specCount - a.specCount || a.vcode.localeCompare(b.vcode));
   }
 
+  return filteredGroups;
+}
+function renderVconf() {
+  const el = document.getElementById("vconfBody");
+  if (!el) return;
+  const vf = state.vconfFilter || { q: "", status: "", sort: "materials", expandAll: false, page: 1 };
+  const allGroups = buildScopedVconfGroups(), filteredGroups = filteredVconfGroups();
   const totalSkus = filteredGroups.reduce((acc, g) => acc + g.scopedCount, 0);
-  const multi3Plus = filteredGroups.filter((g) => g.fullSpecCount >= 3).length;
+  const reviews = filteredGroups.filter((g) => g.reviewStatus === "待确认").length;
 
   let h = renderScopeLinkageBar("同V码冲突") + '<div class="mps-kpi-grid">'
-    + '<div class="mps-kpi"><div class="k-lb">当前范围冲突 V 码组数</div><div class="k-vl" style="color:var(--red)">' + filteredGroups.length.toLocaleString() + ' <small style="font-size:12px;color:var(--muted);font-weight:500">组</small></div><div class="k-sub">全局共 ' + (STATS.vconfGroups || 0).toLocaleString() + ' 组冲突 V 码</div></div>'
-    + '<div class="mps-kpi"><div class="k-lb">涉及冲突 SKU 数</div><div class="k-vl" style="color:var(--orange)">' + totalSkus.toLocaleString() + ' <small style="font-size:12px;color:var(--muted);font-weight:500">个</small></div><div class="k-sub">全局共 ' + (STATS.vconf || 0).toLocaleString() + ' 个物料命中同 V 码冲突</div></div>'
-    + '<div class="mps-kpi"><div class="k-lb">当前范围≥3 种规格的命中组</div><div class="k-vl" style="color:var(--purple)">' + multi3Plus.toLocaleString() + ' <small style="font-size:12px;color:var(--muted);font-weight:500">组</small></div><div class="k-sub">当前筛选范围内存在 3 种及以上规格</div></div>'
-    + '<div class="mps-kpi"><div class="k-lb">判定口径说明</div><div class="k-vl" style="font-size:13.5px;line-height:1.4;color:var(--blue-deep)">剔除「内部周转」及预失效 X / F<br>比对 原始装数 + 标准化规格</div><div class="k-sub">保留乘法因子顺序（1×10×6 = 10×6 ≠ 1×6×10）</div></div>'
+    + '<div class="mps-kpi"><div class="k-lb">当前范围待核查 V 码</div><div class="k-vl">' + filteredGroups.length.toLocaleString() + ' <small style="font-size:12px">组</small></div><div class="k-sub">规格冲突 ' + (filteredGroups.length - reviews) + ' 组 · 待确认 ' + reviews + ' 组</div></div>'
+    + '<div class="mps-kpi"><div class="k-lb">涉及物料数</div><div class="k-vl">' + totalSkus.toLocaleString() + ' <small style="font-size:12px">个</small></div><div class="k-sub">包含待确认记录，不自动改写源数据</div></div>'
+    + '<div class="mps-kpi"><div class="k-lb">物料说明一致 · 待确认</div><div class="k-vl" style="color:var(--orange)">' + reviews + ' <small style="font-size:12px">组</small></div><div class="k-sub">同装数、规格换序，说明中的装数写法一致</div></div>'
+    + '<div class="mps-kpi"><div class="k-lb">判定口径说明</div><div class="k-vl" style="font-size:13.5px;line-height:1.4;color:var(--blue-deep)">先筛选，再核查同 V 码<br>排除内部周转及预失效 X / F</div><div class="k-sub">说明证据不足或装数不同，继续保留规格冲突</div></div>'
     + '</div>';
+
+  h += '<div class="vconf-toolbar" aria-label="核查状态">' + ["", "规格冲突", "待确认"].map((s) => '<button class="fchip' + ((vf.status || "") === s ? ' on' : '') + '" data-act="vconf-status" data-v="' + s + '">' + (s || '全部') + ' ' + allGroups.filter((g) => !s || g.reviewStatus === s).length + '</button>').join('') + '</div>';
 
   /* 工具栏：V码/规格搜索 + 排序 + 全部展开明细 */
   const sbtn = (on, lb, val) => '<button class="fchip' + (on ? " on" : "") + '" data-act="vconf-sort" data-v="' + val + '">' + lb + '</button>';
@@ -2304,7 +2314,7 @@ function renderVconf() {
   const pageGroups = filteredGroups.slice((pg - 1) * pageSize, pg * pageSize);
 
   h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:12.5px;color:var(--muted)">'
-    + '<span>当前显示 <b>' + filteredGroups.length.toLocaleString() + '</b> 组同 V 码冲突 · 第 ' + pg + ' / ' + pages + ' 页（每页 ' + pageSize + ' 组）</span>'
+    + '<span>当前显示 <b>' + filteredGroups.length.toLocaleString() + '</b> 组同 V 码核查记录 · 第 ' + pg + ' / ' + pages + ' 页（每页 ' + pageSize + ' 组）</span>'
     + '<div style="display:flex;gap:6px">'
     + '<button class="mini-btn" data-act="vconf-page" data-v="' + (pg - 1) + '"' + (pg <= 1 ? " disabled" : "") + '>上一页</button>'
     + '<button class="mini-btn" data-act="vconf-page" data-v="' + (pg + 1) + '"' + (pg >= pages ? " disabled" : "") + '>下一页</button>'
@@ -2318,11 +2328,12 @@ function renderVconf() {
 
   h += '<div class="vconf-group-list">';
   for (const g of pageGroups) {
-    h += '<div class="vconf-card">'
+    h += '<div class="vconf-card' + (g.reviewStatus === '待确认' ? ' is-review' : '') + '">'
       + '<div class="vconf-card-hd">'
       + '<span class="vc-code">' + ic("link", 13) + ' ' + esc(g.vcode) + '</span>'
-      + '<span class="tag red">当前范围 <b>' + g.specCount + '</b> 种规格 / <b>' + g.materialCount + '</b> 个物料</span>'
-      + '<span class="tag orange">当前范围冲突依据：' + g.fullSpecCount + ' 种规格 / ' + g.fullMaterialCount + ' 个物料</span>'
+      + '<span class="tag ' + (g.reviewStatus === '待确认' ? 'orange' : 'red') + '">' + esc(g.reviewStatus) + '</span>'
+      + '<span class="tag">' + esc(g.conflictType) + '</span>'
+      + '<span class="tag">' + g.specCount + ' 种规格 / ' + g.materialCount + ' 个物料</span>'
       + (g.cats.length ? '<span class="tag blue">' + esc(g.cats.join(" / ")) + '</span>' : '')
       + (g.brands.length ? '<span class="tag">' + esc(g.brands.join(" / ")) + '</span>' : '')
       + '<div class="vc-acts">'
@@ -2331,7 +2342,7 @@ function renderVconf() {
       + '</div></div>';
 
     /* 并排展示该 V 码下的每一种不同规格组合（原始装数 + MDM 物料规格 + 标准化乘积表达式 + 涉及的物料编码胶囊） */
-    h += '<div class="vconf-variant-grid">';
+    h += '<div class="vconf-evidence">' + esc(g.reviewReason) + '</div><div class="vconf-variant-grid">';
     g.variants.forEach((v, idx) => {
       h += '<div class="vconf-var-box diff-hi">'
         + '<div class="vv-top">'
@@ -2358,7 +2369,7 @@ function renderVconf() {
     h += '<details style="padding:8px 14px;font-size:12px"' + (vf.expandAll || filteredGroups.length <= 3 ? " open" : "") + '>'
       + '<summary style="cursor:pointer;color:var(--blue);font-weight:650;user-select:none">展开核对该 V 码全部 ' + g.members.length + ' 个物料明细（原始装数 / 物料规格 / 标准化规格 / 规格乘积 / 包装规格）</summary>'
       + '<div style="overflow-x:auto;margin-top:8px"><table class="fields-table" style="border:1px solid var(--line)"><thead><tr style="background:#f4f8fc">'
-      + '<th>物料编码</th><th>状态</th><th>品类三级</th><th>原始装数</th><th>MDM物料规格</th><th>标准化规格</th><th>规格乘积</th><th>主单位</th><th>包装层级规格</th><th>物料说明</th><th>操作</th>'
+      + '<th>物料编码</th><th>状态</th><th>品类三级</th><th>原始装数</th><th>MDM物料规格</th><th>标准化规格</th><th>规格乘积</th><th>主单位</th><th>包装层级规格</th><th>物料说明</th><th>说明装数</th><th>操作</th>'
       + '</tr></thead><tbody>'
       + g.members.map((m) => '<tr>'
         + '<td class="mono"><a href="' + esc(buildDetailDeepLinkUrl(m.material)) + '" data-act="open-detail-page" data-material="' + esc(m.material) + '" style="color:var(--blue-deep);font-weight:700">' + esc(m.material) + '</a></td>'
@@ -2371,6 +2382,7 @@ function renderVconf() {
         + '<td>' + esc(m.unit || "—") + '</td>'
         + '<td style="font-size:11.5px">' + esc(m.pack || "—") + '</td>'
         + '<td style="max-width:260px">' + esc(m.desc || "—") + '</td>'
+        + '<td class="mono">' + esc(g.descriptionSpecs[m.material] || '未识别') + '</td>'
         + '<td style="white-space:nowrap">'
         + '<button class="mini-btn" style="padding:2px 7px;min-height:24px" data-act="view-detail" data-material="' + esc(m.material) + '" title="抽屉速览">' + ic("eye", 11) + '</button> '
         + '<button class="mini-btn" style="padding:2px 7px;min-height:24px" data-act="add-sku" data-material="' + esc(m.material) + '" title="加入对比篮">' + ic("plus", 11) + '</button>'

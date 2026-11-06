@@ -36,8 +36,8 @@ function renderStaticButtons() {
   if (vconfTitle) vconfTitle.innerHTML = ic("link", 15) + " 同V码冲突 · 规格差异分组核查";
   var vconfFltBtn = document.querySelector('[data-act="vconf-filter-all"]');
   if (vconfFltBtn) vconfFltBtn.innerHTML = ic("filter", 14) + " 在查询结果中仅看同V码冲突";
-  var vconfExpBtn = document.querySelector('[data-act="export-vconf-csv"]');
-  if (vconfExpBtn) vconfExpBtn.innerHTML = ic("download", 14) + " 导出同V码冲突核查 CSV";
+  var vconfExpBtn = document.querySelector('[data-act="export-vconf-xlsx"]');
+  if (vconfExpBtn) vconfExpBtn.innerHTML = ic("download", 14) + " 导出核查清单 Excel";
   document.getElementById("resultsTitle").innerHTML = ic("table", 15) + " 查询结果";
   document.getElementById("analyzeTitle").innerHTML = ic("bar-chart", 15) + " 字段分析（按业务适用域精准诊断）";
   document.getElementById("rulesTitle").innerHTML = ic("file-text", 15) + " 口径与规则";
@@ -839,7 +839,7 @@ function boolCell(key, v, r) {
 /* ---------- 问题明细 → 可读分组标签 ---------- */
 const FLAG_SHORT = {
   MISS: "缺失", PFM: "工艺缺失", NUM: "错值", PFN: "数值异常", PFC: "矛盾",
-  PAIR: "不成对", LEVEL: "层级不符", BOX: "盒巾待确认", VCONF: "同V码冲突",
+  PAIR: "不成对", LEVEL: "层级不符", BOX: "盒巾待确认", VCONF: "同V码冲突", VREVIEW: "同V码待确认",
   SPEC: "装数不符", ROUTE: "路线异常", PFI: "提示", PFP: "待核",
 };
 function flagsChips(r) {
@@ -857,7 +857,7 @@ function flagsChips(r) {
     const meta = FLAG_META[code] || { name: code, sev: "mid", icon: "tag" };
     const fields = [...new Set(byCode[code])].filter(Boolean);
     let text = "";
-    if (["VCONF", "ROUTE", "SPEC"].includes(code)) {
+    if (["VCONF", "VREVIEW", "ROUTE", "SPEC"].includes(code)) {
       text = ""; /* 标签本身已说明问题 */
     } else if (["PFC", "PFP", "BOX", "PFI"].includes(code)) {
       text = fields.length ? "：" + fields.slice(0, 2).map(esc).join("；") + (fields.length > 2 ? " 等" + fields.length + " 项" : "") : "";
@@ -871,8 +871,8 @@ function flagsChips(r) {
       text = "：" + parts.join("、") + (fields.length > 3 ? " 等" + fields.length + " 项" : "");
     }
     const cls = meta.sev === "high" ? "red" : meta.sev === "mid" ? "orange" : "";
-    if (code === "VCONF" && r.vcode) {
-      out.push('<span class="tag ' + cls + ' fsum clickable" data-act="vconf-inspect" data-vcode="' + esc(r.vcode) + '" title="点击查看 V码 ' + esc(r.vcode) + ' 的同V码规格冲突对比">'
+    if (["VCONF", "VREVIEW"].includes(code) && r.vcode) {
+      out.push('<span class="tag ' + (code === 'VREVIEW' ? 'orange' : cls) + ' fsum clickable" data-act="vconf-inspect" data-vcode="' + esc(r.vcode) + '" title="点击查看 V码 ' + esc(r.vcode) + ' 的规格核查依据">'
         + ic(meta.icon, 10) + esc(FLAG_SHORT[code] || code) + " (" + esc(r.vcode) + ")</span>");
     } else {
       out.push('<span class="tag ' + cls + ' fsum" title="' + esc(meta.name + (fields.length ? "：" + fields.join("、") : "")) + '">'

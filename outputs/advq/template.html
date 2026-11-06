@@ -583,6 +583,11 @@ table.grid.is-all-fields .sc-3 .cell-desc { width: 208px; min-width: 208px; max-
 .vconf-card-hd { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; background: linear-gradient(90deg, #fff6f6 0%, #fbfdff 100%); border-bottom: 1px solid #f2dada; }
 .vconf-card-hd .vc-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 800; font-size: 14.5px; color: #b8322f; background: #fff; border: 1px solid #f3c8c6; border-radius: 7px; padding: 2px 10px; }
 .vconf-card-hd .vc-acts { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.vconf-card.is-review { border-color:#ecd7b2; border-left-color:var(--orange); }
+.vconf-card.is-review .vconf-card-hd { background:#fffaf1; border-color:#ecd7b2; }
+.vconf-card.is-review .vc-code { color:#946011; border-color:#ecd7b2; }
+.vconf-card.is-review .diff-hi { background:#fffcf5; border-color:#ecd7b2; }
+.vconf-evidence { padding:8px 14px 0; font-size:12px; color:var(--muted); }
 .vconf-variant-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 8px; padding: 10px 14px; background: #fcfdff; border-bottom: 1px dashed var(--line); }
 .vconf-var-box { border: 1px solid #dce6f2; border-radius: 8px; padding: 8px 11px; background: #fff; display: flex; flex-direction: column; gap: 4px; }
 .vconf-var-box.diff-hi { border-color: #f3c8c6; background: #fffafa; }
@@ -1236,10 +1241,10 @@ body:has(.basket-dock:not([hidden])) #toast {bottom:78px;}
   <section class="sec tabpanel" id="panel-vconf">
     <div class="sec-head">
       <h2 id="vconfTitle"></h2>
-      <span class="sub" id="vconfSub">以精确 V 码分组（剔除内部周转及预失效 X/F），核对同一 V 码下出现多种「原始装数 + 标准化物料规格乘积表达式」的冲突组</span>
+      <span class="sub" id="vconfSub">按当前筛选范围核查规格差异；说明中的装数写法一致且仅规格换序时降为待确认</span>
       <div class="right">
         <button class="tool-btn" data-act="vconf-filter-all"></button>
-        <button class="tool-btn primary" data-act="export-vconf-csv"></button>
+        <button class="tool-btn primary" data-act="export-vconf-xlsx"></button>
       </div>
     </div>
     <div class="sec-body" id="vconfBody"></div>

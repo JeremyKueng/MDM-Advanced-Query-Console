@@ -7,10 +7,29 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-from vcode_conflicts import rebuild_vcode_conflicts, refresh_dataset_conflicts
+from vcode_conflicts import rebuild_vcode_conflicts, refresh_dataset_conflicts, classify_conflict
 
 
 class VcodeConflictTests(unittest.TestCase):
+    def test_description_evidence_and_review_downgrade(self):
+        cases = json.loads((ROOT / "tests/fixtures/vcode-review.json").read_text())
+        for case in cases:
+            with self.subTest(case=case["vcode"]):
+                rows = [{"material": f"{case['vcode']}-{i}", "vcode": case["vcode"], "load": case["load"], "flags": "NUM:层数|VCONF", **m}
+                        for i, m in enumerate(case["members"])]
+                original = deepcopy(rows)
+                group = rebuild_vcode_conflicts(rows)[0]
+                self.assertEqual(group["reviewStatus"], case["expectedStatus"])
+                self.assertEqual(group["conflictType"], case["expectedType"])
+                self.assertEqual(classify_conflict(rows)["reviewStatus"], group["reviewStatus"])
+                for old, row in zip(original, rows):
+                    for key in old.keys() - {"flags"}:
+                        self.assertEqual(row[key], old[key])
+                    self.assertIn("NUM:层数", row["flags"])
+                    self.assertEqual("VREVIEW" in row["flags"], case["expectedStatus"] == "待确认")
+                    self.assertEqual(row["issueCount"], 2)
+                self.assertEqual(rebuild_vcode_conflicts(rows)[0], group)
+
     def test_exclusions_precede_grouping_and_only_conflict_flags_change(self):
         rows = json.loads((ROOT / "tests/fixtures/vcode-conflicts.json").read_text())
         before = deepcopy(rows)

@@ -154,7 +154,7 @@ function applyUserSettings(s) {
   state.filters.columnFilters = normalizeColumnFilters(f.columnFilters);
   state.focusFilter = { group: "", reason: "", q: "", sort: "severity", page: 1, pageSize: 40 };
   state.analyzeFilter = { q: "", sort: "issue", scopeMode: "scope", valMode: "top", family: "" };
-  state.vconfFilter = { q: "", sort: "materials", expandAll: false, page: 1 };
+  state.vconfFilter = { q: "", status: "", sort: "materials", expandAll: false, page: 1 };
   state.processCheckFilter = { onlyIssue: typeof s.mpsFilter?.attributeOnlyIssue === "boolean" ? s.mpsFilter.attributeOnlyIssue : true, page: 1 };
   state.mpsFilter = { status: "", cat: "", issueType: "", onlyIssue: false, page: 1 };
   // 旧版在 MPS 子页查看工艺属性的用户，迁移到主数据治理的独立页。

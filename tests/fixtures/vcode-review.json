@@ -1,0 +1,22 @@
+[
+  {"vcode":"REVIEW-A","load":92,"expectedStatus":"待确认","expectedType":"同装数不同排列","members":[
+    {"specC":"2*46","desc":"Demo (1x2x46's)"}, {"specC":"46*2","desc":"Demo 2x46 pcs INT."}]},
+  {"vcode":"REVIEW-B","load":96,"expectedStatus":"待确认","expectedType":"同装数不同排列","members":[
+    {"specC":"12*8","desc":"Demo 60x90XL (12x8s) G1"}, {"specC":"8*12","desc":"Demo 60x90XL (１２Ｘ８s) G2"}]},
+  {"vcode":"REVIEW-C","load":72,"expectedStatus":"规格冲突","expectedType":"同装数不同排列","members":[
+    {"specC":"6*12","desc":"Demo 6x12s"}, {"specC":"12*6","desc":"Demo 12x6s"}]},
+  {"vcode":"REVIEW-D","load":60,"expectedStatus":"规格冲突","expectedType":"同装数不同排列","members":[
+    {"specC":"6*10","desc":"Demo 6x10s"}, {"specC":"10*6","desc":"Demo without count"}]},
+  {"vcode":"REVIEW-E","load":36,"expectedStatus":"规格冲突","expectedType":"不同装数","members":[
+    {"specC":"4*9","desc":"Demo 4x9s"}, {"specC":"9*4","load":72,"desc":"Demo 4x9s"}]},
+  {"vcode":"REVIEW-F","load":12,"expectedStatus":"规格冲突","expectedType":"同装数不同排列","members":[
+    {"specC":"3*4","desc":"Demo 3x4s"}, {"specC":"2*6","desc":"Demo 3x4s"}]},
+  {"vcode":"REVIEW-G","load":96,"expectedStatus":"规格冲突","expectedType":"同装数不同排列","members":[
+    {"specC":"12*8","desc":"Demo 12x8s"}, {"specC":"8*12","desc":"Demo 12x8cm"}]},
+  {"vcode":"REVIEW-H","load":96,"expectedStatus":"规格冲突","expectedType":"同装数不同排列","members":[
+    {"specC":"12*8","desc":"Demo 12x8s"}, {"specC":"8*12","desc":"Demo 12x8s / 8x12s"}]},
+  {"vcode":"REVIEW-I","load":96,"expectedStatus":"规格冲突","expectedType":"同装数不同排列","members":[
+    {"specC":"12*8","desc":"Demo 12x8s"}, {"specC":"8*12","desc":"Demo (12+12)x8s"}]},
+  {"vcode":"REVIEW-J","load":0,"expectedStatus":"规格冲突","expectedType":"同装数不同排列","members":[
+    {"specC":"12*8","desc":"Demo 12x8s"}, {"specC":"8*12","desc":"Demo 12x8s"}]}
+]

@@ -67,6 +67,7 @@ const FLAG_META = {
   PAIR:  { name: "包装数量错值",     sev: "high", gov: "numeric",       icon: "package" },
   LEVEL: { name: "包装层级不一致",   sev: "mid",  gov: "packaging",     icon: "layers" },
   VCONF: { name: "同V码规格冲突",    sev: "mid",  gov: "packaging",     icon: "link" },
+  VREVIEW: { name: "同V码规格待确认", sev: "low", gov: "packaging", icon: "link" },
   SPEC:  { name: "装数与规格乘积不符", sev: "mid", gov: "packaging",    icon: "calc" },
   ROUTE: { name: "路线逻辑异常",     sev: "high", gov: "packaging",     icon: "route" },
   PFM:   { name: "工艺属性必填缺失", sev: "low",  gov: "supplement",    icon: "edit" },
@@ -148,7 +149,7 @@ const state = {
   expandedMore: new Set(),   // 已展开“更多N个”的筛选行 key（展开后隐藏“更多N个”胶囊）
   focusFilter: { group: "", reason: "", q: "", sort: "severity", page: 1, pageSize: 40 },
   analyzeFilter: { q: "", sort: "issue", scopeMode: "scope", valMode: "top", family: "" },
-  vconfFilter: { q: "", sort: "materials", expandAll: false, page: 1 },
+  vconfFilter: { q: "", status: "", sort: "materials", expandAll: false, page: 1 },
   processCheckFilter: { onlyIssue: true, page: 1 },
   mpsFilter: { status: "", cat: "", issueType: "", onlyIssue: false, page: 1 },
   q: "",
@@ -701,14 +702,60 @@ async function loadDataset() {
   return JSON.parse(text);
 }
 
-const VCONF_RULE_DESCRIPTION = "剔除新品类型=内部周转及预失效=X、F后，以原始装数 + 物料规格乘积表达式识别同V码多规格；保留乘法因子顺序，1×10×6 与 10×6 等同、1×6×10 不同。";
+const VCONF_RULE_DESCRIPTION = "先筛选并剔除新品类型=内部周转及预失效=X、F，再以原始装数 + 有序规格识别同V码差异，区分不同装数、同装数不同排列；仅装数相同、规格因子换序且每条物料说明的可比装数写法一致时降为待确认，保留原始值与判断依据。";
+function vconfSpecFactors(value) {
+  const text = String(value || "").normalize("NFKC").trim();
+  if (!/^\d+(?:\.\d+)?(?:\s*[xX×*✕]\s*\d+(?:\.\d+)?)*$/.test(text)) return null;
+  const factors = text.split(/\s*[xX×*✕]\s*/).map(Number);
+  while (factors.length > 1 && factors[0] === 1) factors.shift();
+  return factors.every((n) => n > 0) ? factors : null;
+}
+function vconfFactorText(factors) { return factors.map((n) => String(Number(n.toPrecision(15)))).join("×"); }
+function vconfFactorSet(factors) { return JSON.stringify([...factors].sort((a, b) => a - b)); }
+function vconfDescriptionSpecs(description, factors) {
+  const text = String(description || "").normalize("NFKC"), found = new Map();
+  const pattern = /\d+(?:\.\d+)?(?:\s*[xX×*✕]\s*\d+(?:\.\d+)?)+/g;
+  for (const match of text.matchAll(pattern)) {
+    const before = text.slice(0, match.index), after = text.slice(match.index + match[0].length);
+    if (/[\d.+xX×*✕]\s*$/.test(before) || /^\s*(?:[.\d+xX×*✕]|mm|cm|米|毫米|厘米)/i.test(after)
+      || /\)\s*[xX×*✕]\s*$/.test(before) || /^\s*\)\s*[xX×*✕]/.test(after)) continue;
+    const parsed = vconfSpecFactors(match[0]);
+    if (parsed && vconfFactorSet(parsed) === vconfFactorSet(factors)) found.set(vconfFactorText(parsed), match[0]);
+  }
+  return found;
+}
+function classifyVconf(members) {
+  const loads = new Set(members.map((r) => r.load ?? null));
+  const result = { conflictType: loads.size > 1 ? "不同装数" : "同装数不同排列", reviewStatus: "规格冲突", reviewReason: "原始装数不同", descriptionSpecs: {} };
+  if (loads.size > 1) return result;
+  const parsed = members.map((r) => vconfSpecFactors(r.specC));
+  if (!parsed.length || parsed.some((f) => !f) || parsed.some((f) => vconfFactorSet(f) !== vconfFactorSet(parsed[0]))) {
+    result.reviewReason = "规格差异不只是相同因子换序，保留核查"; return result;
+  }
+  const load = members[0].load, product = parsed[0].reduce((a, b) => a * b, 1);
+  if (typeof load !== "number" || load <= 0 || Math.abs(product - load) > Math.max(1e-6, Math.abs(load) * 1e-9)) {
+    result.reviewReason = "装数缺失或规格乘积与装数不一致，保留核查"; return result;
+  }
+  const orientations = new Set(); let complete = true;
+  for (const row of members) {
+    const evidence = vconfDescriptionSpecs(row.desc, parsed[0]);
+    result.descriptionSpecs[row.material] = [...evidence.keys()].join("；");
+    complete = complete && evidence.size === 1;
+    for (const orientation of evidence.keys()) orientations.add(orientation);
+  }
+  if (complete && orientations.size === 1) {
+    result.reviewStatus = "待确认";
+    result.reviewReason = "装数相同、规格因子仅换序；物料说明均为 " + [...orientations][0] + "，疑似规格填写顺序不一致";
+  } else result.reviewReason = orientations.size > 1 ? "物料说明的装数写法不一致或存在多个可比表达式，保留核查" : "部分物料说明缺少明确的可比装数，保留核查";
+  return result;
+}
 function vconfEligible(row) {
   return !!String(row.vcode || "").trim() && String(row.npt || "").trim() !== "内部周转" && !["X", "F"].includes(String(row.pre || "").trim().toUpperCase());
 }
 function rebuildVconfIndex(scope = rows) {
   const groups = new Map(); vconfByVcode.clear();
   for (const row of rows) {
-    row.vconf = 0; row._flags = row._flags.filter((flag) => flag !== "VCONF");
+    row.vconf = 0; row._flags = row._flags.filter((flag) => !["VCONF", "VREVIEW"].includes(flag));
   }
   for (const row of scope) {
     if (!vconfEligible(row)) continue;
@@ -718,8 +765,10 @@ function rebuildVconfIndex(scope = rows) {
   for (const [vcode, members] of groups) {
     const signatures = new Set(members.map((row) => JSON.stringify([row.load ?? null, row.specC || ""])));
     if (signatures.size < 2) continue;
-    members.forEach((row) => { row.vconf = 1; row._flags.push("VCONF"); });
+    const assessment = classifyVconf(members);
+    members.forEach((row) => { row.vconf = 1; row._flags.push(assessment.reviewStatus === "待确认" ? "VREVIEW" : "VCONF"); });
     vconfByVcode.set(vcode, { vcode, materialCount: members.length, specCount: signatures.size,
+      ...assessment,
       specs: members.slice(0, 8).map((row) => [row.material, row.load, row.specC || "", String(row.desc || "").slice(0, 40)]) });
   }
   for (const row of rows) { row.flags = row._flags.join("|"); row.issueCount = row._flags.length; }
