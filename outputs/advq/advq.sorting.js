@@ -1,3 +1,84 @@
+/* 草稿与结果表各自排序；冻结列不会成为拖拽源或落点。 */
+function reorderComposedField(kind, from, target, after) {
+  if (kind !== "draft" && (kind !== "result" || !activeNamedFieldView())) return false;
+  if (from === target || PINNED_KEYS.includes(from) || PINNED_KEYS.includes(target)) return false;
+  const keys = kind === "draft" ? composedFieldKeys() : orderedVisibleKeys();
+  if (!keys.includes(from) || !keys.includes(target)) return false;
+  const next = keys.filter((k) => k !== from);
+  next.splice(next.indexOf(target) + (after ? 1 : 0), 0, from);
+  if (next.every((k, i) => k === keys[i])) return false;
+  if (kind === "draft") {
+    state.fieldComposeKeys = next;
+    renderFieldComposeList();
+  } else applyVisibleListOrder(next, true);
+  return true;
+}
+function bindComposedFieldSorting() {
+  let drag = null, marker = null;
+  const gripSelector = "[data-field-order]";
+  function clearMarker() { if (marker) delete marker.dataset.fieldOrderDrop; marker = null; }
+  function finish() {
+    clearMarker();
+    const old = drag; drag = null;
+    if (!old) return;
+    old.grip.classList.remove("field-order-dragging");
+    if (old.grip.hasPointerCapture(old.id)) old.grip.releasePointerCapture(old.id);
+  }
+  function hit(e) {
+    const hovered = document.elementFromPoint(e.clientX, e.clientY);
+    const node = hovered?.closest(drag.kind === "draft" ? "[data-compose-key]" : "#mainTableWrap th[data-field]");
+    const grip = node?.querySelector(gripSelector);
+    if (!grip || grip === drag.grip || grip.dataset.fieldOrder !== drag.kind) return null;
+    const rect = node.getBoundingClientRect();
+    const after = drag.kind === "draft" ? e.clientY > rect.top + rect.height / 2 : e.clientX > rect.left + rect.width / 2;
+    return { node, key: grip.dataset.v, after };
+  }
+  document.addEventListener("pointerdown", (e) => {
+    const grip = e.target.closest(gripSelector);
+    if (grip && !drag && e.button === 0) drag = { grip, kind: grip.dataset.fieldOrder, key: grip.dataset.v, id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
+  });
+  document.addEventListener("pointermove", (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    if (!drag.grip.isConnected) { finish(); return; }
+    if (!drag.moved) {
+      if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 5) return;
+      drag.moved = true;
+      drag.grip.setPointerCapture(e.pointerId);
+      drag.grip.classList.add("field-order-dragging");
+    }
+    e.preventDefault();
+    clearMarker();
+    const target = hit(e);
+    if (target) { marker = target.node; marker.dataset.fieldOrderDrop = target.after ? "after" : "before"; }
+  }, { passive: false });
+  document.addEventListener("pointerup", (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const target = drag.moved ? hit(e) : null, {kind, key} = drag;
+    finish();
+    if (target) reorderComposedField(kind, key, target.key, target.after);
+  });
+  document.addEventListener("pointercancel", (e) => { if (drag && e.pointerId === drag.id) finish(); });
+  document.addEventListener("lostpointercapture", (e) => { if (drag && e.pointerId === drag.id) finish(); });
+  window.addEventListener("blur", finish);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && drag) { e.preventDefault(); finish(); return; }
+    if (e.isComposing || e.defaultPrevented) return;
+    if (e.key === "Enter" && e.target.id === "fieldComposeName") { e.preventDefault(); applyFieldComposer(); return; }
+    if (e.key === "Escape" && state.fieldDrawer && state.fieldDrawerMode === "compose" && !document.querySelector("#modal-mask.open")) { e.preventDefault(); closeAllDrawers(); return; }
+    const grip = e.target.closest(gripSelector);
+    if (!grip || !e.altKey) return;
+    const kind = grip.dataset.fieldOrder, key = grip.dataset.v;
+    const vertical = kind === "draft";
+    if (!(vertical ? ["ArrowUp", "ArrowDown"] : ["ArrowLeft", "ArrowRight"]).includes(e.key)) return;
+    e.preventDefault();
+    const keys = vertical ? composedFieldKeys() : orderedVisibleKeys();
+    const after = e.key === "ArrowDown" || e.key === "ArrowRight";
+    if (reorderComposedField(kind, key, keys[keys.indexOf(key) + (after ? 1 : -1)], after)) {
+      [...document.querySelectorAll(gripSelector)].find((g) => g.dataset.fieldOrder === kind && g.dataset.v === key)?.focus({ preventScroll: true });
+    }
+  });
+}
+
 /* 视图预设与查询结果快捷入口共用顺序；拖动不应用视图、不改字段或查询。 */
 function movePresetView(name, before) {
   const current = mdmPresetNames();

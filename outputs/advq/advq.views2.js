@@ -1035,10 +1035,49 @@ function syncFieldDrawerInPlace() {
   return true;
 }
 
+function renderFieldComposeList() {
+  const list = document.getElementById("fieldComposeList");
+  if (!list) return;
+  const keys = composedFieldKeys(), scroll = list.scrollTop;
+  document.getElementById("fieldComposeTotal").textContent = keys.length;
+  document.getElementById("fieldComposeApply").disabled = !keys.length;
+  document.getElementById("fieldComposeClear").disabled = !keys.length;
+  list.innerHTML = keys.length ? keys.map((k, i) => {
+    const label = esc(schemaByKey.get(k).label), key = esc(k);
+    return '<div class="field-compose-row" data-compose-key="' + key + '">'
+      + '<span class="field-compose-index">' + (i + 1) + '</span>'
+      + '<button type="button" class="field-order-grip field-compose-grip" data-field-order="draft" data-v="' + key + '" title="拖拽排序，或按 Alt + 上下方向键" aria-label="调整顺序：' + label + '">⠿ <span>' + label + '</span></button>'
+      + '<button type="button" class="mini-btn" data-act="field-compose-remove" data-v="' + key + '" aria-label="移除：' + label + '">×</button></div>';
+  }).join("") : '<div class="field-compose-empty">回到表格，点击字段名称旁的「＋」收集字段。</div>';
+  list.scrollTop = scroll;
+}
+function renderFieldComposer() {
+  const body = document.getElementById("fieldBody");
+  if (!document.getElementById("fieldComposeList")) {
+    body.innerHTML = '<div class="field-compose-panel">'
+      + '<div class="fd-viewbar"><div class="fd-view-controls">'
+      + '<input id="fieldComposeName" maxlength="40" placeholder="输入视图名称" aria-label="新视图名称" value="' + esc(state.fieldComposeName) + '">'
+      + '<button type="button" class="tool-btn primary" id="fieldComposeApply" data-act="field-compose-apply">保存并应用</button></div>'
+      + '<p class="field-compose-note">仅调整展示列，沿用当前搜索和筛选。</p></div>'
+      + '<div class="field-compose-caption"><strong>已选字段 <span id="fieldComposeTotal"></span></strong>'
+      + '<button type="button" class="mini-btn" id="fieldComposeClear" data-act="field-compose-clear">清空草稿</button></div>'
+      + '<p class="field-compose-note">拖动字段调整顺序。物料编码、V码、物料规格、物料说明自动保留在最前面。</p>'
+      + '<div id="fieldComposeList" class="field-compose-list"></div></div>';
+  }
+  renderFieldComposeList();
+}
 function renderFieldDrawer() {
   const drawer = document.getElementById("fieldDrawer");
   const mask = document.getElementById("drawerMask");
   if (!state.fieldDrawer) { drawer.classList.remove("open"); if (!state.detail && !state.compareOpen) mask.classList.remove("open"); return; }
+  const composing = state.fieldDrawerMode === "compose";
+  drawer.classList.toggle("field-compose-mode", composing);
+  document.getElementById("fieldDrawerTitle").textContent = composing ? "组建自定义视图" : "字段管理 · 拖拽调整展示顺序";
+  if (composing) {
+    renderFieldComposer();
+    drawer.classList.add("open"); mask.classList.add("open");
+    return;
+  }
 
   /* 如果抽屉已经处于打开且结构已渲染完成，直接走原位无闪烁更新，避免右屏重刷 */
   if (drawer.classList.contains("open") && document.getElementById("fdPoolBody")) {

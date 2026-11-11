@@ -12,18 +12,21 @@ function renderViewSeg() {
 function openDrawer(which) {
   state.detail = which === "detail" ? state.detail : null;
   state.fieldDrawer = which === "fields";
+  state.fieldDrawerMode = "manage";
   state.compareOpen = which === "compare";
   if (which === "detail") { state.fieldDrawer = false; state.compareOpen = false; }
   if (which === "fields") { state.detail = null; state.compareOpen = false; }
   if (which === "compare") { state.detail = null; state.fieldDrawer = false; }
 }
 function closeAllDrawers() {
+  const composing = state.fieldDrawer && state.fieldDrawerMode === "compose";
   state.detail = null; state.fieldDrawer = false; state.compareOpen = false;
   document.getElementById("detailDrawer").classList.remove("open");
   document.getElementById("fieldDrawer").classList.remove("open");
   document.getElementById("compareDrawer").classList.remove("open");
   document.getElementById("drawerMask").classList.remove("open");
   if (typeof syncBodyScrollLock === "function") syncBodyScrollLock();
+  if (composing) document.querySelector('[data-act="field-compose-open"]')?.focus({ preventScroll: true });
 }
 
 /* ---------- 对比篮 ---------- */
@@ -302,15 +305,21 @@ function renderSuggest(list) {
 
 /* ---------- 字段拖拽与排序（左屏已选字段顺序实时同步至横版列与竖版卡片，核心 4 列固定在最前） ---------- */
 let dragKey = null;
-function applyVisibleListOrder(newVisList) {
+function visibleFieldLayout(newVisList) {
   const pinned = PINNED_KEYS.filter((k) => schemaByKey.has(k));
   const pinnedSet = new Set(pinned);
-  const customVis = newVisList.filter((k) => !pinnedSet.has(k) && !MDM_HIDDEN_KEYS.has(k) && schemaByKey.has(k));
+  const customVis = [...new Set(newVisList)].filter((k) => !pinnedSet.has(k) && !MDM_HIDDEN_KEYS.has(k) && schemaByKey.has(k));
   const finalVis = [...pinned, ...customVis];
   const seen = new Set(finalVis);
   const rest = state.order.filter((k) => !seen.has(k) && !MDM_HIDDEN_KEYS.has(k));
-  state.order = [...finalVis, ...rest];
-  state.visible = [...finalVis];
+  return { order: [...finalVis, ...rest], visible: finalVis };
+}
+function applyVisibleListOrder(newVisList, saveCustomOrder = false) {
+  const named = saveCustomOrder && !fieldViewIsDirty() && activeNamedFieldView();
+  const { order, visible } = visibleFieldLayout(newVisList);
+  state.order = order;
+  state.visible = visible;
+  if (named) { named.order = [...order]; named.visible = [...visible]; }
   saveStateDebounced();
   // 字段勾选与排序只更新展示列；不重算筛选、不重建右侧候选池。
   preserveWorkspaceViewport(() => {
@@ -320,6 +329,41 @@ function applyVisibleListOrder(newVisList) {
     if (state.tab === "results" || state.tab === "analyze") renderWorkspacePanel(true);
     if (state.compareOpen) renderCompare();
   });
+}
+function syncFieldComposeMarkers() {
+  const keys = new Set(composedFieldKeys()), count = document.getElementById("fieldComposeCount");
+  if (count) { count.textContent = keys.size; count.hidden = !keys.size; }
+  document.querySelectorAll('#mainTableWrap .column-collect').forEach((button) => {
+    const on = keys.has(button.dataset.v);
+    button.textContent = on ? "✓" : "+";
+    button.title = on ? "已选，点击移出草稿" : "加入视图草稿";
+    button.setAttribute("aria-pressed", String(on));
+  });
+}
+function changeFieldCompose(key, action) {
+  const keys = composedFieldKeys();
+  if (action === "clear") state.fieldComposeKeys = [];
+  else if (keys.includes(key)) state.fieldComposeKeys = keys.filter((k) => k !== key);
+  else if (action === "toggle" && schemaByKey.has(key) && !PINNED_KEYS.includes(key) && !MDM_HIDDEN_KEYS.has(key)) state.fieldComposeKeys = [...keys, key];
+  else return;
+  syncFieldComposeMarkers();
+  if (state.fieldDrawer && state.fieldDrawerMode === "compose") renderFieldComposeList();
+}
+function applyFieldComposer() {
+  const keys = composedFieldKeys(), input = document.getElementById("fieldComposeName");
+  if (!keys.length || !input) return false;
+  const name = input.value.trim().slice(0, 40), layout = visibleFieldLayout(keys);
+  try { storeNamedFieldView(name, layout.order, layout.visible); }
+  catch (err) { toast(err.message, true); input.focus(); return false; }
+  state.fieldComposeKeys = []; state.fieldComposeName = "";
+  closeAllDrawers();
+  applyVisibleListOrder(keys);
+  const wrap = document.getElementById("mainTableWrap");
+  if (wrap) { wrap.scrollLeft = 0; syncTableXnav("mainTableWrap"); }
+  saveState();
+  document.querySelector('[data-act="field-compose-open"]')?.focus({ preventScroll: true });
+  toast("已应用「" + name + "」" + (state.view === "table" ? "，拖动表头可调整列序" : ""));
+  return true;
 }
 function bindFieldDrag() {
   const body = document.getElementById("fieldBody");
@@ -1310,6 +1354,15 @@ function onClick(e) {
       clearTimeout(customFilterTimer); state.filters = defaultQueryFilters(""); refreshFilteredViews();
       toast("已保留搜索词，扩大到全部状态与分类"); break;
     case "field-view-apply": applyFieldView(v); break;
+    case "field-compose-toggle": changeFieldCompose(v, "toggle"); break;
+    case "field-compose-remove": changeFieldCompose(v, "remove"); break;
+    case "field-compose-clear": changeFieldCompose(null, "clear"); break;
+    case "field-compose-open":
+      openDrawer("fields"); state.fieldDrawerMode = "compose";
+      renderFieldDrawer(); syncBodyScrollLock();
+      document.getElementById("fieldComposeName").focus({ preventScroll: true });
+      break;
+    case "field-compose-apply": applyFieldComposer(); break;
     case "field-view-save": saveNamedFieldView(); break;
     case "field-view-create":
     case "field-view-copy": {
@@ -2549,6 +2602,7 @@ function bindInputs() {
     }
   }, 180);
   document.addEventListener("input", (e) => {
+    if (e.target.id === "fieldComposeName") state.fieldComposeName = e.target.value;
     if (e.target.id === "fdViewName") {
       state.fieldViewDraftName = e.target.value;
       document.getElementById("fdViewStatus").textContent = "未保存修改";
@@ -2668,6 +2722,7 @@ async function init() {
   window.addEventListener("pagehide", saveState);
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") saveState(); });
   bindFieldDrag();
+  bindComposedFieldSorting();
   bindPresetViewSorting();
   bindQuickDetailConfig();
   bindDpConfigSorting();

@@ -1,0 +1,43 @@
+const fs = require("node:fs"), path = require("node:path"), vm = require("node:vm"), assert = require("node:assert/strict");
+const root = path.resolve(__dirname, ".."), dataset = JSON.parse(fs.readFileSync(path.join(root, "outputs/advq/dataset.json")));
+const ctx = vm.createContext({ dataset, assert, console, navigator: {}, setTimeout: () => 0, clearTimeout: () => {} });
+for (const name of ["core", "config", "views", "sorting", "events"]) {
+  vm.runInContext(fs.readFileSync(path.join(root, "outputs/advq/advq." + name + ".js"), "utf8").replace(/init\(\);\s*$/, ""), ctx);
+}
+vm.runInContext(`
+DATASET = dataset; buildIndexes();
+const all = DATASET.presets["123列全表头"];
+applyUserSettings({v:8, visible:all, order:all, activeFieldView:"preset:123列全表头", q:"核对", filters:{cats:["软抽"], status:"有效", columnFilters:{brand:["示例品牌"]}}});
+const snapshot = () => JSON.stringify(captureUserSettings());
+const same = (a,b) => assert.equal(JSON.stringify(a),JSON.stringify(b));
+const original = snapshot(), oldPreset = JSON.stringify(all);
+const input = {value:"包装核对", focus(){}};
+document = {getElementById:id=>id==="fieldComposeName"?input:null, querySelector:()=>null, querySelectorAll:()=>[]};
+let renders = 0, saves = 0;
+toast=()=>{}; closeAllDrawers=()=>{}; renderFieldComposeList=()=>{};
+preserveWorkspaceViewport=fn=>fn(); syncFieldDrawerInPlace=()=>{}; renderWorkspacePanel=()=>{renders++;}; saveState=()=>{saves++;};
+const workspacePanelCache = new Map();
+changeFieldCompose("net","toggle"); changeFieldCompose("load","toggle"); changeFieldCompose("brand","toggle");
+changeFieldCompose("brand","toggle"); changeFieldCompose("material","toggle");
+same(composedFieldKeys(),["net","load"]); assert.equal(snapshot(),original); assert.equal(renders,0);
+assert.equal(reorderComposedField("draft","load","net",false),true);
+same(composedFieldKeys(),["load","net"]); assert.equal(snapshot(),original);
+assert.equal(applyFieldComposer(),true); assert.equal(saves,1); assert.equal(renders,1);
+const id=state.activeFieldView;
+same(orderedVisibleKeys(),[...PINNED_KEYS,"load","net"]); assert.equal(state.savedViews[0].name,"包装核对");
+assert.equal(state.q,"核对"); same(captureUserSettings().filters,JSON.parse(original).filters);
+assert.equal(JSON.stringify(all),oldPreset); same(composedFieldKeys(),[]);
+assert.equal(reorderComposedField("result","net","material",false),false);
+assert.equal(reorderComposedField("result","net","load",false),true);
+same(state.savedViews[0].visible,[...PINNED_KEYS,"net","load"]); assert.equal(fieldViewIsDirty(),false);
+const stored = decodeUserConfig(configDoc(JSON.parse(snapshot())));
+applyUserSettings(stored); same(orderedVisibleKeys(),[...PINNED_KEYS,"net","load"]);
+applyFieldView("preset:123列全表头"); applyFieldView(id);
+same(orderedVisibleKeys(),[...PINNED_KEYS,"net","load"]);
+changeFieldCompose("brand","toggle"); assert.equal(applyFieldComposer(),false,"duplicate name does not overwrite a saved view");
+same(composedFieldKeys(),["brand"]); assert.equal(state.savedViews.length,1);
+applyVisibleListOrder([...PINNED_KEYS,"net","load","brand"]);
+assert.equal(reorderComposedField("result","brand","net",false),true);
+same(state.savedViews[0].visible,[...PINNED_KEYS,"net","load"]); assert.equal(fieldViewIsDirty(),true);
+console.log("PASS: draft collection, ordering, save/apply, persistent table order, and query isolation.");
+`, ctx);

@@ -492,6 +492,26 @@ table.grid.is-all-fields .sc-3 .cell-desc { width: 208px; min-width: 208px; max-
 
 /* ---------- 字段管理（横竖两屏 / 左右双栏对照） ---------- */
 #fieldDrawer { width: min(1080px, 96vw); }
+#fieldDrawer.field-compose-mode { width: min(500px, 96vw); }
+#fieldDrawer .field-compose-only, #fieldDrawer.field-compose-mode .field-manage-only { display: none; }
+#fieldDrawer.field-compose-mode .field-compose-only { display: inline-flex; }
+.field-compose-count { display: inline-grid; place-items: center; min-width: 19px; padding: 0 4px; border-radius: 10px; background: #e6f0ff; color: var(--blue-deep); }
+.field-compose-count[hidden] { display: none; }
+.field-compose-note { margin: 8px 0; font-size: 12px; color: var(--muted); }
+.field-compose-caption { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 14px; }
+.field-compose-list { display: grid; gap: 5px; }
+.field-compose-row { display: flex; gap: 8px; align-items: center; padding: 4px 7px 4px 10px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+.field-compose-index { min-width: 22px; font-size: 12px; color: var(--muted); text-align: center; }
+.field-compose-grip { flex: 1; min-width: 0; min-height: 32px; padding: 4px 3px; border: 0; text-align: left; background: transparent; color: var(--ink); font: inherit; }
+.field-compose-grip span { margin-left: 4px; }
+.field-compose-empty { padding: 18px 10px; color: var(--muted); }
+.field-order-grip, .column-heading .field-order-grip { cursor: grab; touch-action: none; user-select: none; }
+.field-order-grip:active { cursor: grabbing; }
+.field-order-dragging { opacity: .45; }
+.field-compose-row[data-field-order-drop="before"] { box-shadow: inset 0 2px var(--blue); }
+.field-compose-row[data-field-order-drop="after"] { box-shadow: inset 0 -2px var(--blue); }
+#mainTableWrap th[data-field-order-drop="before"] { box-shadow: inset 3px 0 var(--blue); }
+#mainTableWrap th[data-field-order-drop="after"] { box-shadow: inset -3px 0 var(--blue); }
 
 /* 命名视图与可配置的一键切换入口 */
 #panel-results > .sec-head { flex-wrap: wrap; gap: 10px; }
@@ -1086,6 +1106,10 @@ body:has(.basket-dock:not([hidden])) #toast {bottom:78px;}
 .column-heading button {border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;padding:0;display:inline-flex;align-items:center;}
 .column-heading .column-label {display:flex;align-items:center;min-width:0;flex:1;text-align:left;gap:3px;white-space:nowrap;}
 .column-heading .column-dropdown {flex:none;border-radius:4px;padding:4px;margin:-4px 0;opacity:.65;}
+.column-heading .column-collect {flex:none;justify-content:center;align-self:flex-start;min-width:17px;height:17px;margin-top:-4px;border-radius:4px;font-size:14px;line-height:1;color:var(--blue-deep);opacity:.65;}
+.column-heading .column-collect:hover,.column-heading .column-collect[aria-pressed="true"] {background:#e1edff;color:var(--blue);opacity:1;}
+.view-shortcuts .field-view-picker {max-width:min(160px,24vw);text-overflow:ellipsis;}
+@media(max-width:560px){.view-shortcuts{flex-wrap:wrap;}.view-shortcut-list{flex:1 1 65%;}}
 .column-heading button:hover,.column-filtered {color:var(--blue)!important;}
 .column-heading .column-dropdown:hover,.column-filtered .column-dropdown {background:#e1edff;opacity:1;}
 .column-heading button:focus-visible {outline:2px solid var(--blue);outline-offset:3px;}
@@ -1352,10 +1376,11 @@ body:has(.basket-dock:not([hidden])) #toast {bottom:78px;}
 </aside>
 <aside class="drawer" id="fieldDrawer">
   <div class="drawer-hd">
-    <span class="t">字段管理 · 拖拽调整展示顺序</span>
+    <span class="t" id="fieldDrawerTitle">字段管理 · 拖拽调整展示顺序</span>
     <div class="right">
-      <button class="tb-btn" data-act="open-personal-config">个人配置</button>
-      <button class="tb-btn" data-act="fields-reset">恢复默认</button>
+      <button class="tb-btn field-compose-only" data-act="open-fields">完整字段管理</button>
+      <button class="tb-btn field-manage-only" data-act="open-personal-config">个人配置</button>
+      <button class="tb-btn field-manage-only" data-act="fields-reset">恢复默认</button>
       <button class="tb-btn" data-act="close-drawer">关闭</button>
     </div>
   </div>

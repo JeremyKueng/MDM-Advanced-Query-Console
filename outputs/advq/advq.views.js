@@ -980,6 +980,8 @@ function renderResults() {
   const pageKey = [state.page, state.sort.key, state.sort.dir, derived.total, ...derived.pageRows.map((r) => r.material)].join("|");
   const prevScrollTop = prevWrap && prevWrap._pageKey === pageKey ? prevWrap.scrollTop : 0;
   let h = tableXnavHtml("mainTableWrap", vis.length + 1) + '<div class="table-wrap results-viewport" id="mainTableWrap" tabindex="0" role="region" aria-label="查询结果表格，可上下左右滚动"><table class="grid' + (vis.length >= 80 ? ' is-all-fields' : '') + '"><thead><tr>';
+  const collected = new Set(composedFieldKeys());
+  const canReorder = !!activeNamedFieldView();
   for (let i = 0; i < vis.length; i++) {
     const k = vis[i];
     const s = schemaByKey.get(k);
@@ -987,9 +989,12 @@ function renderResults() {
     const stCls = (i < 4 ? " sticky-col sc-" + i : "") + (resultColumnClass(k) ? " " + resultColumnClass(k) : "") + (fieldLocator.key === k ? " field-located" : "");
     const pinBadge = i < 4 ? '<span style="font-size:10px;color:var(--blue);margin-left:2px" title="固定冻结列">📌</span>' : "";
     const filtered = Object.prototype.hasOwnProperty.call(state.filters.columnFilters || {}, k);
+    const movable = i >= 4 && canReorder;
+    const isCollected = collected.has(k);
     h += '<th class="column-header' + stCls + (filtered ? ' column-filtered' : '') + '" data-field="' + esc(k) + '" aria-sort="' + (on ? state.sort.dir === 1 ? 'ascending' : 'descending' : 'none') + '"><div class="column-heading">'
-      + '<span class="column-label">' + esc(s.label) + pinBadge
-      + (on ? '<span class="arrow">' + (state.sort.dir === 1 ? '▲' : '▼') + '</span>' : '') + '</span>'
+      + (movable ? '<button type="button" class="column-label field-order-grip" data-field-order="result" data-v="' + esc(k) + '" title="拖拽调整列序，或按 Alt + 左右方向键" aria-label="调整列序：' + esc(s.label) + '">' : '<span class="column-label">')
+      + esc(s.label) + pinBadge + (on ? '<span class="arrow">' + (state.sort.dir === 1 ? '▲' : '▼') + '</span>' : '') + (movable ? '</button>' : '</span>')
+      + (i >= 4 ? '<button type="button" class="column-collect" data-act="field-compose-toggle" data-v="' + esc(k) + '" aria-label="加入视图草稿：' + esc(s.label) + '" title="' + (isCollected ? '已选，点击移出草稿' : '加入视图草稿') + '" aria-pressed="' + isCollected + '">' + (isCollected ? '✓' : '+') + '</button>' : '')
       + '<button type="button" class="column-dropdown" data-column-action="open" data-field="' + esc(k) + '" aria-label="' + esc(s.label) + (filtered ? '，已筛选' : '') + '筛选菜单" aria-haspopup="dialog" aria-expanded="false">' + ic(filtered ? 'filter' : 'chevron-down', 13) + '</button></div></th>';
   }
   h += '<th class="sticky-right" title="右侧固定冻结操作列">操作 📌</th></tr></thead><tbody>';

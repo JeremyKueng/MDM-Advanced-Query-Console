@@ -276,6 +276,9 @@ function fieldViewKeys(id) {
   const v = state.savedViews.find((v) => "view:" + v.id === id);
   return v ? v.visible : [];
 }
+function activeNamedFieldView() {
+  return state.savedViews.find((v) => "view:" + v.id === state.activeFieldView);
+}
 function fieldViewIsDirty() {
   if (!state.activeFieldView) return false;
   const keys = fieldViewKeys(state.activeFieldView);
@@ -286,10 +289,14 @@ function renderViewShortcuts() {
   const el = document.getElementById("resultViewShortcuts"); if (!el) return;
   const all = new Map(fieldViewOptions().map((v) => [v.id, v]));
   const selected = state.activeFieldView && !fieldViewIsDirty() ? state.activeFieldView : "";
+  const composeCount = composedFieldKeys().length;
   el.innerHTML = '<span class="view-shortcut-label">展示字段</span><div class="view-shortcut-list">' + orderPresetShortcuts(state.viewShortcuts).filter((id) => all.has(id)).map((id) => '<button class="tool-btn' + (selected === id ? ' active' : '') + '" aria-pressed="' + (selected === id) + '" data-act="field-view-apply" data-v="' + esc(id) + '" title="只切换字段，不改变搜索和筛选">' + esc(all.get(id).name) + '</button>').join("")
     + '</div><select class="field-view-picker" data-act="field-view-select" aria-label="更多字段组合"><option value="">更多字段…</option>'
     + [...all.values()].map((v) => '<option value="' + esc(v.id) + '">' + esc(v.name) + '</option>').join("") + '</select>'
-    + '<button class="view-shortcut-config" data-act="configure-shortcuts" title="选择常用字段组合及排列顺序">' + ic("settings", 13) + '</button>';
+    + '<button class="view-shortcut-config" data-act="configure-shortcuts" title="选择常用字段组合及排列顺序">' + ic("settings", 13) + '</button>'
+    + '<button type="button" class="tool-btn field-compose-open" data-act="field-compose-open">' + ic("plus", 13) + ' 组建视图<span class="field-compose-count" id="fieldComposeCount"' + (composeCount ? '' : ' hidden') + '>' + composeCount + '</span></button>';
+  const picker = el.querySelector?.(".field-view-picker");
+  if (picker && selected.startsWith("view:") && !state.viewShortcuts.includes(selected)) picker.value = selected;
 }
 function syncSavedViewControls() {
   syncPresetViewControls();
@@ -343,16 +350,21 @@ function applyFieldView(id) {
 }
 function saveNamedFieldView(asNew = false) {
   const input = document.getElementById("fdViewName"), name = (input.value || "").trim().slice(0, 40);
-  if (!name) { toast("请填写自定义视图名称", true); input.focus(); return; }
-  let active = !asNew && state.savedViews.find((v) => "view:" + v.id === state.activeFieldView);
-  if (state.savedViews.some((v) => v.name === name && v !== active)) { toast("已有同名视图，请换一个名称", true); input.focus(); return; }
-  const v = { id: active ? active.id : "fv_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 6), name, order: [...state.order], visible: orderedVisibleKeys() };
+  const active = !asNew && activeNamedFieldView();
+  try { storeNamedFieldView(name, state.order, orderedVisibleKeys(), active); }
+  catch (err) { toast(err.message, true); input.focus(); return; }
+  saveState(); syncSavedViewControls(); renderShortcutEditor();
+  toast("已保存视图「" + name + "」");
+}
+function storeNamedFieldView(name, order, visible, active) {
+  if (!name) throw new Error("请填写自定义视图名称");
+  if (state.savedViews.some((v) => v.name === name && v !== active)) throw new Error("已有同名视图，请换一个名称");
+  const v = { id: active ? active.id : "fv_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 6), name, order: [...order], visible: [...visible] };
   if (active) state.savedViews[state.savedViews.indexOf(active)] = v;
   else state.savedViews.push(v);
   state.activeFieldView = "view:" + v.id;
   state.fieldViewDraftName = null;
-  saveState(); syncSavedViewControls(); renderShortcutEditor();
-  toast("已保存视图「" + name + "」");
+  return v;
 }
 
 /* 查询视图保存完整查询上下文；字段视图继续只换列，兼容原有配置。 */
