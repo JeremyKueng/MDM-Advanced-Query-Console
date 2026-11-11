@@ -65,6 +65,11 @@ function bindComposedFieldSorting() {
     if (e.isComposing || e.defaultPrevented) return;
     if (e.key === "Enter" && e.target.id === "fieldComposeName") { e.preventDefault(); applyFieldComposer(); return; }
     if (e.key === "Escape" && state.fieldDrawer && state.fieldDrawerMode === "compose" && !document.querySelector("#modal-mask.open")) { e.preventDefault(); closeAllDrawers(); return; }
+    if (e.key === "Escape" && state.tab === "results" && pickingResultFields()
+        && !e.target.matches("input, textarea, select, [contenteditable]")
+        && !document.querySelector(".drawer.open, #modal-mask.open, .page-overlay.open")) {
+      e.preventDefault(); setFieldComposeSelecting(false); return;
+    }
     const grip = e.target.closest(gripSelector);
     if (!grip || !e.altKey) return;
     const kind = grip.dataset.fieldOrder, key = grip.dataset.v;

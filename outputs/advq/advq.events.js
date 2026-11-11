@@ -26,7 +26,7 @@ function closeAllDrawers() {
   document.getElementById("compareDrawer").classList.remove("open");
   document.getElementById("drawerMask").classList.remove("open");
   if (typeof syncBodyScrollLock === "function") syncBodyScrollLock();
-  if (composing) document.querySelector('[data-act="field-compose-open"]')?.focus({ preventScroll: true });
+  if (composing) focusFieldComposeControl();
 }
 
 /* ---------- 对比篮 ---------- */
@@ -330,14 +330,34 @@ function applyVisibleListOrder(newVisList, saveCustomOrder = false) {
     if (state.compareOpen) renderCompare();
   });
 }
+function focusFieldComposeControl() {
+  const entry = document.getElementById("fieldComposeEntry");
+  (entry?.disabled ? document.querySelector('.field-compose-exit') : entry)?.focus({ preventScroll: true });
+}
+function setFieldComposeSelecting(selecting) {
+  if (selecting === state.fieldComposeSelecting || selecting && !canPickResultFields()) return;
+  state.fieldComposeSelecting = selecting;
+  if (typeof closeColumnFilterMenu === "function") closeColumnFilterMenu();
+  const wrap = document.getElementById("mainTableWrap"), head = wrap?.querySelector("thead");
+  if (head) {
+    const { scrollLeft, scrollTop } = wrap;
+    head.innerHTML = resultTableHeadHtml(orderedVisibleKeys());
+    wrap.scrollLeft = scrollLeft; wrap.scrollTop = scrollTop;
+    syncTableXnav("mainTableWrap");
+  }
+  renderViewShortcuts();
+  const hint = document.getElementById("fieldComposeHint"), browse = document.getElementById("resultBrowseHint");
+  if (hint) hint.hidden = !pickingResultFields();
+  if (browse) browse.hidden = pickingResultFields();
+  focusFieldComposeControl();
+}
 function syncFieldComposeMarkers() {
   const keys = new Set(composedFieldKeys()), count = document.getElementById("fieldComposeCount");
-  if (count) { count.textContent = keys.size; count.hidden = !keys.size; }
+  if (count) { count.textContent = keys.size; count.hidden = !pickingResultFields() && !keys.size; }
+  const entry = document.getElementById("fieldComposeEntry");
+  if (entry?.dataset.act === "field-compose-open") entry.disabled = !keys.size;
   document.querySelectorAll('#mainTableWrap .column-collect').forEach((button) => {
-    const on = keys.has(button.dataset.v);
-    button.textContent = on ? "✓" : "+";
-    button.title = on ? "已选，点击移出草稿" : "加入视图草稿";
-    button.setAttribute("aria-pressed", String(on));
+    button.setAttribute("aria-pressed", String(keys.has(button.dataset.v)));
   });
 }
 function changeFieldCompose(key, action) {
@@ -355,13 +375,13 @@ function applyFieldComposer() {
   const name = input.value.trim().slice(0, 40), layout = visibleFieldLayout(keys);
   try { storeNamedFieldView(name, layout.order, layout.visible); }
   catch (err) { toast(err.message, true); input.focus(); return false; }
-  state.fieldComposeKeys = []; state.fieldComposeName = "";
+  state.fieldComposeKeys = []; state.fieldComposeName = ""; state.fieldComposeSelecting = false;
   closeAllDrawers();
   applyVisibleListOrder(keys);
   const wrap = document.getElementById("mainTableWrap");
   if (wrap) { wrap.scrollLeft = 0; syncTableXnav("mainTableWrap"); }
   saveState();
-  document.querySelector('[data-act="field-compose-open"]')?.focus({ preventScroll: true });
+  focusFieldComposeControl();
   toast("已应用「" + name + "」" + (state.view === "table" ? "，拖动表头可调整列序" : ""));
   return true;
 }
@@ -1354,10 +1374,13 @@ function onClick(e) {
       clearTimeout(customFilterTimer); state.filters = defaultQueryFilters(""); refreshFilteredViews();
       toast("已保留搜索词，扩大到全部状态与分类"); break;
     case "field-view-apply": applyFieldView(v); break;
-    case "field-compose-toggle": changeFieldCompose(v, "toggle"); break;
+    case "field-compose-start": setFieldComposeSelecting(true); break;
+    case "field-compose-end": setFieldComposeSelecting(false); break;
+    case "field-compose-toggle": if (pickingResultFields()) changeFieldCompose(v, "toggle"); break;
     case "field-compose-remove": changeFieldCompose(v, "remove"); break;
     case "field-compose-clear": changeFieldCompose(null, "clear"); break;
     case "field-compose-open":
+      if (!composedFieldKeys().length) break;
       openDrawer("fields"); state.fieldDrawerMode = "compose";
       renderFieldDrawer(); syncBodyScrollLock();
       document.getElementById("fieldComposeName").focus({ preventScroll: true });

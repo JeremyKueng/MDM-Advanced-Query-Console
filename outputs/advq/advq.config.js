@@ -285,16 +285,24 @@ function fieldViewIsDirty() {
   const validKeys = [...new Set([...PINNED_KEYS, ...keys])].filter((k) => schemaByKey.has(k) && !MDM_HIDDEN_KEYS.has(k));
   return JSON.stringify(orderedVisibleKeys()) !== JSON.stringify(validKeys);
 }
+function fieldComposeControlsHtml() {
+  const count = composedFieldKeys().length, selecting = pickingResultFields(), canPick = canPickResultFields();
+  if (!canPick && !count) return "";
+  const organize = selecting || !canPick;
+  return '<div class="field-compose-controls">'
+    + '<button type="button" class="tool-btn' + (selecting ? ' primary' : '') + '" id="fieldComposeEntry" data-act="' + (organize ? 'field-compose-open' : 'field-compose-start') + '"' + (organize && !count ? ' disabled' : '') + '>'
+    + (organize ? '整理字段' : '组建视图') + '<span class="field-compose-count" id="fieldComposeCount" aria-live="polite"' + (selecting || count ? '' : ' hidden') + '>' + count + '</span></button>'
+    + (selecting ? '<button type="button" class="view-shortcut-config field-compose-exit" data-act="field-compose-end" title="退出选择，保留已选字段">退出选列</button>' : '') + '</div>';
+}
 function renderViewShortcuts() {
   const el = document.getElementById("resultViewShortcuts"); if (!el) return;
   const all = new Map(fieldViewOptions().map((v) => [v.id, v]));
   const selected = state.activeFieldView && !fieldViewIsDirty() ? state.activeFieldView : "";
-  const composeCount = composedFieldKeys().length;
   el.innerHTML = '<span class="view-shortcut-label">展示字段</span><div class="view-shortcut-list">' + orderPresetShortcuts(state.viewShortcuts).filter((id) => all.has(id)).map((id) => '<button class="tool-btn' + (selected === id ? ' active' : '') + '" aria-pressed="' + (selected === id) + '" data-act="field-view-apply" data-v="' + esc(id) + '" title="只切换字段，不改变搜索和筛选">' + esc(all.get(id).name) + '</button>').join("")
     + '</div><select class="field-view-picker" data-act="field-view-select" aria-label="更多字段组合"><option value="">更多字段…</option>'
     + [...all.values()].map((v) => '<option value="' + esc(v.id) + '">' + esc(v.name) + '</option>').join("") + '</select>'
     + '<button class="view-shortcut-config" data-act="configure-shortcuts" title="选择常用字段组合及排列顺序">' + ic("settings", 13) + '</button>'
-    + '<button type="button" class="tool-btn field-compose-open" data-act="field-compose-open">' + ic("plus", 13) + ' 组建视图<span class="field-compose-count" id="fieldComposeCount"' + (composeCount ? '' : ' hidden') + '>' + composeCount + '</span></button>';
+    + fieldComposeControlsHtml();
   const picker = el.querySelector?.(".field-view-picker");
   if (picker && selected.startsWith("view:") && !state.viewShortcuts.includes(selected)) picker.value = selected;
 }

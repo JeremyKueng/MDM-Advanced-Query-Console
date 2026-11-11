@@ -753,9 +753,11 @@ function renderFilters() {
 }
 function renderResultLine() {
   const report = querySearchReport(), batch = report.batch;
+  const selecting = pickingResultFields();
   const source = '<span class="source-time" title="数据源：' + esc(DATASET.meta.source || '') + '">数据时间 ' + esc(DATASET.meta.sourceStamp || '未提供') + '</span>';
-  let h = '<div class="result-feedback"><span>' + (state.q ? '搜索“' + esc(state.q.length > 45 ? state.q.slice(0, 45) + '…' : state.q).replace(/\n/g, ' · ') + '”' : '勾选物料可对比，点击编码或说明可速览') + '</span>'
-    + (state.q && !batch ? '<span>· ' + derived.total.toLocaleString() + ' 条匹配' + (state.sort.explicit ? '，按' + esc(schemaByKey.get(state.sort.key)?.label || state.sort.key) + (state.sort.dir === 1 ? '升序' : '降序') : state.qMode === 'smart' ? '，精准命中优先' : '') + '</span>' : '') + source + '</div>';
+  let h = '<div class="result-feedback"><span' + (!state.q ? ' id="resultBrowseHint"' + (selecting ? ' hidden' : '') : '') + '>' + (state.q ? '搜索“' + esc(state.q.length > 45 ? state.q.slice(0, 45) + '…' : state.q).replace(/\n/g, ' · ') + '”' : '勾选物料可对比，点击编码或说明可速览') + '</span>'
+    + (state.q && !batch ? '<span>· ' + derived.total.toLocaleString() + ' 条匹配' + (state.sort.explicit ? '，按' + esc(schemaByKey.get(state.sort.key)?.label || state.sort.key) + (state.sort.dir === 1 ? '升序' : '降序') : state.qMode === 'smart' ? '，精准命中优先' : '') + '</span>' : '')
+    + '<span id="fieldComposeHint" class="field-compose-hint"' + (selecting ? '' : ' hidden') + '>选字段中 · 点击表头选择，选完点「整理字段」</span>' + source + '</div>';
   if (batch) {
     const detail = (label, codes, action) => !codes.length ? '' : '<div><b>' + label + ' ' + codes.length + ' 个</b> ' + (action ? '<button class="tool-btn" data-act="copy-query-codes" data-v="' + action + '">复制编码</button>' : '') + '<div class="batch-code-list">' + codes.map(esc).join('、') + '</div></div>';
     h += '<details class="batch-feedback"><summary>批量查码 <b>' + batch.total + '</b> 个 · 当前找到 <b>' + batch.found.length + '</b> 个 · 未找到 <b>' + batch.missing.length + '</b> 个 · 被筛选排除 <b>' + batch.excluded.length + '</b> 个 · 一码多料 <b>' + batch.ambiguous.length + '</b> 个'
@@ -958,6 +960,30 @@ function tableXnavHtml(tableId, colCount) {
     + '<button type="button" class="xn-btn" data-act="xnav-step" data-target="' + esc(tableId) + '" data-dir="end" title="跳到最右侧">最右 ⏭</button>'
     + '</div></div>';
 }
+function resultTableHeadHtml(vis) {
+  const selecting = pickingResultFields(), picked = new Set(composedFieldKeys());
+  const canReorder = !selecting && !!activeNamedFieldView();
+  let h = '<tr>';
+  for (const [i, k] of vis.entries()) {
+    const label = esc(schemaByKey.get(k).label), key = esc(k), pinned = i < 4;
+    const on = state.sort.key === k, col = resultColumnClass(k);
+    const stCls = (pinned ? " sticky-col sc-" + i : "") + (col ? " " + col : "") + (fieldLocator.key === k ? " field-located" : "");
+    const pinBadge = pinned ? '<span style="font-size:10px;color:var(--blue);margin-left:2px" title="固定冻结列">📌</span>' : "";
+    const arrow = on ? '<span class="arrow">' + (state.sort.dir === 1 ? '▲' : '▼') + '</span>' : "";
+    const filtered = Object.prototype.hasOwnProperty.call(state.filters.columnFilters || {}, k);
+    h += '<th class="column-header' + stCls + (filtered ? ' column-filtered' : '') + '" data-field="' + key + '" aria-sort="' + (on ? state.sort.dir === 1 ? 'ascending' : 'descending' : 'none') + '"><div class="column-heading">';
+    if (selecting && !pinned) {
+      h += '<button type="button" class="column-label column-collect" data-act="field-compose-toggle" data-v="' + key + '" aria-label="选择字段：' + label + '" aria-pressed="' + picked.has(k) + '"><span class="field-choice-mark" aria-hidden="true">' + ic("check", 10) + '</span>' + label + arrow + '</button>';
+    } else if (canReorder && !pinned) {
+      h += '<button type="button" class="column-label field-order-grip" data-field-order="result" data-v="' + key + '" title="拖拽调整列序，或按 Alt + 左右方向键" aria-label="调整列序：' + label + '">' + label + arrow + '</button>';
+    } else h += '<span class="column-label">' + label + pinBadge + arrow + '</span>';
+    if (!selecting) {
+      h += '<button type="button" class="column-dropdown" data-column-action="open" data-field="' + key + '" aria-label="' + label + (filtered ? '，已筛选' : '') + '筛选菜单" aria-haspopup="dialog" aria-expanded="false">' + ic(filtered ? 'filter' : 'chevron-down', 13) + '</button>';
+    }
+    h += '</div></th>';
+  }
+  return h + '<th class="sticky-right" title="右侧固定冻结操作列">操作 📌</th></tr>';
+}
 function renderResults() {
   if (typeof closeColumnFilterMenu === "function") closeColumnFilterMenu();
   renderViewShortcuts();
@@ -979,25 +1005,7 @@ function renderResults() {
   const prevScrollLeft = prevWrap ? prevWrap.scrollLeft : 0;
   const pageKey = [state.page, state.sort.key, state.sort.dir, derived.total, ...derived.pageRows.map((r) => r.material)].join("|");
   const prevScrollTop = prevWrap && prevWrap._pageKey === pageKey ? prevWrap.scrollTop : 0;
-  let h = tableXnavHtml("mainTableWrap", vis.length + 1) + '<div class="table-wrap results-viewport" id="mainTableWrap" tabindex="0" role="region" aria-label="查询结果表格，可上下左右滚动"><table class="grid' + (vis.length >= 80 ? ' is-all-fields' : '') + '"><thead><tr>';
-  const collected = new Set(composedFieldKeys());
-  const canReorder = !!activeNamedFieldView();
-  for (let i = 0; i < vis.length; i++) {
-    const k = vis[i];
-    const s = schemaByKey.get(k);
-    const on = state.sort.key === k;
-    const stCls = (i < 4 ? " sticky-col sc-" + i : "") + (resultColumnClass(k) ? " " + resultColumnClass(k) : "") + (fieldLocator.key === k ? " field-located" : "");
-    const pinBadge = i < 4 ? '<span style="font-size:10px;color:var(--blue);margin-left:2px" title="固定冻结列">📌</span>' : "";
-    const filtered = Object.prototype.hasOwnProperty.call(state.filters.columnFilters || {}, k);
-    const movable = i >= 4 && canReorder;
-    const isCollected = collected.has(k);
-    h += '<th class="column-header' + stCls + (filtered ? ' column-filtered' : '') + '" data-field="' + esc(k) + '" aria-sort="' + (on ? state.sort.dir === 1 ? 'ascending' : 'descending' : 'none') + '"><div class="column-heading">'
-      + (movable ? '<button type="button" class="column-label field-order-grip" data-field-order="result" data-v="' + esc(k) + '" title="拖拽调整列序，或按 Alt + 左右方向键" aria-label="调整列序：' + esc(s.label) + '">' : '<span class="column-label">')
-      + esc(s.label) + pinBadge + (on ? '<span class="arrow">' + (state.sort.dir === 1 ? '▲' : '▼') + '</span>' : '') + (movable ? '</button>' : '</span>')
-      + (i >= 4 ? '<button type="button" class="column-collect" data-act="field-compose-toggle" data-v="' + esc(k) + '" aria-label="加入视图草稿：' + esc(s.label) + '" title="' + (isCollected ? '已选，点击移出草稿' : '加入视图草稿') + '" aria-pressed="' + isCollected + '">' + (isCollected ? '✓' : '+') + '</button>' : '')
-      + '<button type="button" class="column-dropdown" data-column-action="open" data-field="' + esc(k) + '" aria-label="' + esc(s.label) + (filtered ? '，已筛选' : '') + '筛选菜单" aria-haspopup="dialog" aria-expanded="false">' + ic(filtered ? 'filter' : 'chevron-down', 13) + '</button></div></th>';
-  }
-  h += '<th class="sticky-right" title="右侧固定冻结操作列">操作 📌</th></tr></thead><tbody>';
+  let h = tableXnavHtml("mainTableWrap", vis.length + 1) + '<div class="table-wrap results-viewport" id="mainTableWrap" tabindex="0" role="region" aria-label="查询结果表格，可上下左右滚动"><table class="grid' + (vis.length >= 80 ? ' is-all-fields' : '') + '"><thead>' + resultTableHeadHtml(vis) + '</thead><tbody>';
   for (const r of derived.pageRows) {
     h += '<tr class="row' + (r.blocking ? " blocked" : "") + (basketSet.has(r.material) ? " selected" : "") + '" data-material="' + esc(r.material) + '">';
     for (let i = 0; i < vis.length; i++) {

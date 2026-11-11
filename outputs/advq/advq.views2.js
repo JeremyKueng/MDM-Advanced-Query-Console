@@ -1048,7 +1048,7 @@ function renderFieldComposeList() {
       + '<span class="field-compose-index">' + (i + 1) + '</span>'
       + '<button type="button" class="field-order-grip field-compose-grip" data-field-order="draft" data-v="' + key + '" title="拖拽排序，或按 Alt + 上下方向键" aria-label="调整顺序：' + label + '">⠿ <span>' + label + '</span></button>'
       + '<button type="button" class="mini-btn" data-act="field-compose-remove" data-v="' + key + '" aria-label="移除：' + label + '">×</button></div>';
-  }).join("") : '<div class="field-compose-empty">回到表格，点击字段名称旁的「＋」收集字段。</div>';
+  }).join("") : '<div class="field-compose-empty">关闭抽屉，回到表格继续选择字段。</div>';
   list.scrollTop = scroll;
 }
 function renderFieldComposer() {

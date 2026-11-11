@@ -497,6 +497,9 @@ table.grid.is-all-fields .sc-3 .cell-desc { width: 208px; min-width: 208px; max-
 #fieldDrawer.field-compose-mode .field-compose-only { display: inline-flex; }
 .field-compose-count { display: inline-grid; place-items: center; min-width: 19px; padding: 0 4px; border-radius: 10px; background: #e6f0ff; color: var(--blue-deep); }
 .field-compose-count[hidden] { display: none; }
+.field-compose-controls { display: inline-flex; align-items: center; gap: 4px; }
+.field-compose-exit { white-space: nowrap; }
+.field-compose-hint { color: var(--blue-deep); font-weight: 600; }
 .field-compose-note { margin: 8px 0; font-size: 12px; color: var(--muted); }
 .field-compose-caption { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 14px; }
 .field-compose-list { display: grid; gap: 5px; }
@@ -1106,8 +1109,12 @@ body:has(.basket-dock:not([hidden])) #toast {bottom:78px;}
 .column-heading button {border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;padding:0;display:inline-flex;align-items:center;}
 .column-heading .column-label {display:flex;align-items:center;min-width:0;flex:1;text-align:left;gap:3px;white-space:nowrap;}
 .column-heading .column-dropdown {flex:none;border-radius:4px;padding:4px;margin:-4px 0;opacity:.65;}
-.column-heading .column-collect {flex:none;justify-content:center;align-self:flex-start;min-width:17px;height:17px;margin-top:-4px;border-radius:4px;font-size:14px;line-height:1;color:var(--blue-deep);opacity:.65;}
-.column-heading .column-collect:hover,.column-heading .column-collect[aria-pressed="true"] {background:#e1edff;color:var(--blue);opacity:1;}
+.column-heading .column-collect {gap:6px;min-height:21px;border-radius:4px;}
+.column-heading .column-collect:hover,.column-heading .column-collect[aria-pressed="true"] {background:#eaf3ff;color:var(--blue-deep);}
+.field-choice-mark {display:inline-grid;place-items:center;flex:none;width:15px;height:15px;border:1px solid #9eb7d3;border-radius:4px;background:#fff;color:#fff;}
+.field-choice-mark svg {visibility:hidden;}
+.column-collect[aria-pressed="true"] .field-choice-mark {border-color:var(--blue);background:var(--blue);}
+.column-collect[aria-pressed="true"] .field-choice-mark svg {visibility:visible;}
 .view-shortcuts .field-view-picker {max-width:min(160px,24vw);text-overflow:ellipsis;}
 @media(max-width:560px){.view-shortcuts{flex-wrap:wrap;}.view-shortcut-list{flex:1 1 65%;}}
 .column-heading button:hover,.column-filtered {color:var(--blue)!important;}

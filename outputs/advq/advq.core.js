@@ -131,7 +131,7 @@ const state = {
   view: "table",             // table | card
   tab: "results",            // results | focus | vconf | analyze | rules | mps
   savedViews: [], activeFieldView: "", viewShortcuts: [], presetViewOrder: [], fieldViewDraftName: null,
-  fieldComposeKeys: [], fieldComposeName: "", fieldDrawerMode: "manage",
+  fieldComposeKeys: [], fieldComposeName: "", fieldComposeSelecting: false, fieldDrawerMode: "manage",
   queryViews: [], activeQueryView: "",
   order: [],                 // 字段 key 顺序（全部字段）
   visible: [],               // 可见字段 key
@@ -200,6 +200,12 @@ function syncVisibleOrder() {
 }
 function composedFieldKeys() {
   return [...new Set(state.fieldComposeKeys)].filter((k) => schemaByKey.has(k) && !PINNED_KEYS.includes(k) && !MDM_HIDDEN_KEYS.has(k));
+}
+function canPickResultFields() {
+  return state.view === "table" && derived.total > 0 && state.visible.some((k) => !PINNED_KEYS.includes(k) && !MDM_HIDDEN_KEYS.has(k) && schemaByKey.has(k));
+}
+function pickingResultFields() {
+  return state.fieldComposeSelecting && canPickResultFields();
 }
 
 /* ---------- 单品详情全屏看板：自定义视窗模板与条件路由引擎（类多维表格视窗插件） ---------- */
