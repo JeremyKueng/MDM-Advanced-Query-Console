@@ -545,6 +545,8 @@ table.grid.is-all-fields .sc-3 .cell-desc { width: 208px; min-width: 208px; max-
 .fd-shortcut-option small { color: var(--subtle); font-size: 10px; white-space: nowrap; }
 .fd-shortcut-order { display: flex; align-items: center; gap: 3px; }
 .fd-shortcut-order button { min-height: 23px; padding: 1px 6px; }
+.fd-shortcut-order .fd-shortcut-remove { color: var(--muted); }
+.fd-shortcut-order .fd-shortcut-remove:hover { color: var(--red); border-color: #f3c8c8; background: #fff5f5; }
 .fd-shortcut-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 10px; font-size: 11px; color: var(--subtle); }
 @media(max-width: 900px) { #fdShortcutOptions { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @media(max-width: 560px) { #fdShortcutOptions { grid-template-columns: 1fr; } .fd-shortcuts summary span { display: block; margin: 5px 0; } .view-shortcuts { order: 3; flex-basis: 100%; } }
@@ -4656,8 +4658,12 @@ function renderShortcutEditor() {
   const arranged = [...shortcutDraft.map((id) => options.find((o) => o.id === id)).filter(Boolean), ...options.filter((o) => !shortcutDraft.includes(o.id))];
   el.innerHTML = arranged.map((o) => {
     const idx = shortcutDraft.indexOf(o.id), on = idx >= 0;
-    return '<div class="fd-shortcut-option"><label><input type="checkbox" data-act="shortcut-toggle" data-v="' + esc(o.id) + '"' + (on ? ' checked' : '') + '><span>' + esc(o.name) + '</span><small>' + (o.builtin ? '系统预设' : '我的视图') + '</small></label>'
-      + (on ? '<span class="fd-shortcut-order"><small>' + (idx + 1) + '</small><button class="mini-btn" data-act="shortcut-up" data-v="' + esc(o.id) + '"' + (idx === 0 ? ' disabled' : '') + ' aria-label="上移 ' + esc(o.name) + '">↑</button><button class="mini-btn" data-act="shortcut-down" data-v="' + esc(o.id) + '"' + (idx === shortcutDraft.length - 1 ? ' disabled' : '') + ' aria-label="下移 ' + esc(o.name) + '">↓</button></span>' : '') + '</div>';
+    const id = esc(o.id), name = esc(o.name);
+    return '<div class="fd-shortcut-option"><label><input type="checkbox" data-act="shortcut-toggle" data-v="' + id + '"' + (on ? ' checked' : '') + '><span>' + name + '</span><small>' + (o.builtin ? '系统预设' : '我的视图') + '</small></label>'
+      + (on ? '<span class="fd-shortcut-order"><small>' + (idx + 1) + '</small>'
+        + '<button type="button" class="mini-btn" data-act="shortcut-up" data-v="' + id + '"' + (idx === 0 ? ' disabled' : '') + ' aria-label="上移 ' + name + '">↑</button>'
+        + '<button type="button" class="mini-btn" data-act="shortcut-down" data-v="' + id + '"' + (idx === shortcutDraft.length - 1 ? ' disabled' : '') + ' aria-label="下移 ' + name + '">↓</button>'
+        + '<button type="button" class="mini-btn fd-shortcut-remove" data-act="shortcut-remove" data-v="' + id + '" title="移除快捷入口，保存后生效" aria-label="移除快捷入口：' + name + '">' + ic("x", 12) + '</button></span>' : '') + '</div>';
   }).join("");
   const changed = JSON.stringify(shortcutDraft) !== JSON.stringify(state.viewShortcuts);
   document.getElementById("fdShortcutStatus").textContent = changed ? "未保存修改" : "已保存 · 按勾选顺序显示";
@@ -10559,6 +10565,13 @@ function onClick(e) {
       if (idx >= 0 && to >= 0 && to < shortcutDraft.length) { [shortcutDraft[idx], shortcutDraft[to]] = [shortcutDraft[to], shortcutDraft[idx]]; renderShortcutEditor(); }
       break;
     }
+    case "shortcut-remove":
+      if (shortcutDraft?.includes(v)) {
+        shortcutDraft = shortcutDraft.filter((id) => id !== v);
+        renderShortcutEditor();
+        [...document.querySelectorAll('#fdShortcutOptions [data-act="shortcut-toggle"]')].find((input) => input.dataset.v === v)?.focus({ preventScroll: true });
+      }
+      break;
     case "save-shortcuts":
       state.viewShortcuts = [...(shortcutDraft || [])]; updatePresetOrderFromShortcuts(state.viewShortcuts);
       saveState(); syncPresetViewControls(); renderViewShortcuts(); renderShortcutEditor();

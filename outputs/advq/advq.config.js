@@ -340,8 +340,12 @@ function renderShortcutEditor() {
   const arranged = [...shortcutDraft.map((id) => options.find((o) => o.id === id)).filter(Boolean), ...options.filter((o) => !shortcutDraft.includes(o.id))];
   el.innerHTML = arranged.map((o) => {
     const idx = shortcutDraft.indexOf(o.id), on = idx >= 0;
-    return '<div class="fd-shortcut-option"><label><input type="checkbox" data-act="shortcut-toggle" data-v="' + esc(o.id) + '"' + (on ? ' checked' : '') + '><span>' + esc(o.name) + '</span><small>' + (o.builtin ? '系统预设' : '我的视图') + '</small></label>'
-      + (on ? '<span class="fd-shortcut-order"><small>' + (idx + 1) + '</small><button class="mini-btn" data-act="shortcut-up" data-v="' + esc(o.id) + '"' + (idx === 0 ? ' disabled' : '') + ' aria-label="上移 ' + esc(o.name) + '">↑</button><button class="mini-btn" data-act="shortcut-down" data-v="' + esc(o.id) + '"' + (idx === shortcutDraft.length - 1 ? ' disabled' : '') + ' aria-label="下移 ' + esc(o.name) + '">↓</button></span>' : '') + '</div>';
+    const id = esc(o.id), name = esc(o.name);
+    return '<div class="fd-shortcut-option"><label><input type="checkbox" data-act="shortcut-toggle" data-v="' + id + '"' + (on ? ' checked' : '') + '><span>' + name + '</span><small>' + (o.builtin ? '系统预设' : '我的视图') + '</small></label>'
+      + (on ? '<span class="fd-shortcut-order"><small>' + (idx + 1) + '</small>'
+        + '<button type="button" class="mini-btn" data-act="shortcut-up" data-v="' + id + '"' + (idx === 0 ? ' disabled' : '') + ' aria-label="上移 ' + name + '">↑</button>'
+        + '<button type="button" class="mini-btn" data-act="shortcut-down" data-v="' + id + '"' + (idx === shortcutDraft.length - 1 ? ' disabled' : '') + ' aria-label="下移 ' + name + '">↓</button>'
+        + '<button type="button" class="mini-btn fd-shortcut-remove" data-act="shortcut-remove" data-v="' + id + '" title="移除快捷入口，保存后生效" aria-label="移除快捷入口：' + name + '">' + ic("x", 12) + '</button></span>' : '') + '</div>';
   }).join("");
   const changed = JSON.stringify(shortcutDraft) !== JSON.stringify(state.viewShortcuts);
   document.getElementById("fdShortcutStatus").textContent = changed ? "未保存修改" : "已保存 · 按勾选顺序显示";

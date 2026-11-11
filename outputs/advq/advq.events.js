@@ -1422,6 +1422,13 @@ function onClick(e) {
       if (idx >= 0 && to >= 0 && to < shortcutDraft.length) { [shortcutDraft[idx], shortcutDraft[to]] = [shortcutDraft[to], shortcutDraft[idx]]; renderShortcutEditor(); }
       break;
     }
+    case "shortcut-remove":
+      if (shortcutDraft?.includes(v)) {
+        shortcutDraft = shortcutDraft.filter((id) => id !== v);
+        renderShortcutEditor();
+        [...document.querySelectorAll('#fdShortcutOptions [data-act="shortcut-toggle"]')].find((input) => input.dataset.v === v)?.focus({ preventScroll: true });
+      }
+      break;
     case "save-shortcuts":
       state.viewShortcuts = [...(shortcutDraft || [])]; updatePresetOrderFromShortcuts(state.viewShortcuts);
       saveState(); syncPresetViewControls(); renderViewShortcuts(); renderShortcutEditor();
