@@ -1091,6 +1091,7 @@ function renderFieldDrawer() {
   const pinnedSet = new Set(PINNED_KEYS);
 
   shortcutDraft = [...state.viewShortcuts];
+  hiddenShortcutDraft = new Set(state.hiddenShortcutOptions);
   let h = '<div class="fd-viewbar">'
     + '<div class="fd-view-controls"><strong>我的视图</strong><select id="fdSavedViewSel" aria-label="选择自定义视图"></select>'
     + '<input id="fdViewName" maxlength="40" placeholder="输入视图名称，如：质量核查" aria-label="自定义视图名称">'
@@ -1100,7 +1101,8 @@ function renderFieldDrawer() {
     + '<button class="tool-btn" id="fdViewDelete" data-act="field-view-delete">删除</button></div>'
     + '<div class="fd-view-hint"><span id="fdViewStatus"></span><span>保存字段选择与排列顺序</span><span id="fdConfigStatus"></span></div></div>'
     + '<details class="fd-shortcuts" id="fdShortcutEditor"><summary>常用视图配置 <span>选择显示在查询结果标题栏的视图，并调整顺序</span></summary>'
-    + '<div id="fdShortcutOptions"></div><div class="fd-shortcut-actions"><span id="fdShortcutStatus"></span><button class="tool-btn primary" data-act="save-shortcuts">保存快捷视图</button></div></details>'
+    + '<div id="fdShortcutOptions"></div><details class="fd-shortcut-removed" id="fdShortcutRemoved" hidden><summary id="fdShortcutRemovedTitle"></summary><div id="fdShortcutRemovedList"></div></details>'
+    + '<div class="fd-shortcut-actions"><span id="fdShortcutStatus"></span><button class="tool-btn primary" data-act="save-shortcuts">保存快捷视图</button></div></details>'
     + '<div class="fd-toolbar">'
     + '<span class="fd-lbl">视图预设：</span>'
     + '<div id="fdPresetList" class="fd-preset-list" role="group" aria-label="视图预设，拖动调整顺序">'

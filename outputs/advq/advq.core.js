@@ -130,7 +130,7 @@ const SEARCH_FIELDS = [
 const state = {
   view: "table",             // table | card
   tab: "results",            // results | focus | vconf | analyze | rules | mps
-  savedViews: [], activeFieldView: "", viewShortcuts: [], presetViewOrder: [], fieldViewDraftName: null,
+  savedViews: [], activeFieldView: "", viewShortcuts: [], hiddenShortcutOptions: [], presetViewOrder: [], fieldViewDraftName: null,
   fieldComposeKeys: [], fieldComposeName: "", fieldComposeSelecting: false, fieldDrawerMode: "manage",
   queryViews: [], activeQueryView: "",
   order: [],                 // 字段 key 顺序（全部字段）

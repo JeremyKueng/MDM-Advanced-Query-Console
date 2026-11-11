@@ -1405,6 +1405,8 @@ function onClick(e) {
         state.savedViews = state.savedViews.filter((x) => x.id !== active.id);
         state.viewShortcuts = state.viewShortcuts.filter((x) => x !== id);
         if (shortcutDraft) shortcutDraft = shortcutDraft.filter((x) => x !== id);
+        state.hiddenShortcutOptions = state.hiddenShortcutOptions.filter((x) => x !== id);
+        hiddenShortcutDraft?.delete(id);
         state.activeFieldView = ""; state.fieldViewDraftName = null;
         saveState(); syncSavedViewControls(); renderShortcutEditor();
         toast("已删除自定义视图");
@@ -1423,14 +1425,22 @@ function onClick(e) {
       break;
     }
     case "shortcut-remove":
-      if (shortcutDraft?.includes(v)) {
+      if (shortcutDraft && hiddenShortcutDraft && !hiddenShortcutDraft.has(v) && fieldViewOptions().some((o) => o.id === v)) {
         shortcutDraft = shortcutDraft.filter((id) => id !== v);
+        hiddenShortcutDraft.add(v);
+        renderShortcutEditor();
+        document.getElementById("fdShortcutRemovedTitle")?.focus({ preventScroll: true });
+      }
+      break;
+    case "shortcut-restore":
+      if (hiddenShortcutDraft?.delete(v)) {
         renderShortcutEditor();
         [...document.querySelectorAll('#fdShortcutOptions [data-act="shortcut-toggle"]')].find((input) => input.dataset.v === v)?.focus({ preventScroll: true });
       }
       break;
     case "save-shortcuts":
-      state.viewShortcuts = [...(shortcutDraft || [])]; updatePresetOrderFromShortcuts(state.viewShortcuts);
+      state.hiddenShortcutOptions = [...(hiddenShortcutDraft || state.hiddenShortcutOptions)];
+      state.viewShortcuts = (shortcutDraft || []).filter((id) => !state.hiddenShortcutOptions.includes(id)); updatePresetOrderFromShortcuts(state.viewShortcuts);
       saveState(); syncPresetViewControls(); renderViewShortcuts(); renderShortcutEditor();
       toast("已保存常用视图入口与排列顺序"); break;
     case "open-personal-config": openPersonalConfig(); break;

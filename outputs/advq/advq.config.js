@@ -1,7 +1,7 @@
 /* 个人配置独立于构建产物；旧版浏览器配置只迁移，不因代码版本更新重置。 */
 const CONFIG_FORMAT = "mdm-workbench-config";
 const personalConfig = { ready: false, available: false, endpoint: "", path: "", status: "正在读取个人配置…", error: "", lastAt: "", hasStored: false };
-let configSnapshot = "", configDocument = null, configWriting = false, configQueued = null, shortcutDraft = null;
+let configSnapshot = "", configDocument = null, configWriting = false, configQueued = null, shortcutDraft = null, hiddenShortcutDraft = null;
 const stringsOnly = (v) => Array.isArray(v) ? [...new Set(v.filter((x) => typeof x === "string"))] : [];
 const QUERY_FIELD_BUNDLES = {
   "日常查料": ["material", "vcode", "spec", "desc", "brand", "cat", "status", "unit"],
@@ -52,6 +52,7 @@ function captureUserSettings() {
   return {
     v: 8, view: state.view, tab: state.tab, order: [...state.order], visible: orderedVisibleKeys(),
     savedViews: state.savedViews, activeFieldView: state.activeFieldView, viewShortcuts: state.viewShortcuts, presetViewOrder: [...state.presetViewOrder],
+    hiddenShortcutOptions: [...state.hiddenShortcutOptions],
     q: state.q, qMode: state.qMode, qField: state.qField, filterCollapsed: state.filterCollapsed, queryUiVersion: 1,
     queryViews: state.queryViews, activeQueryView: state.activeQueryView,
     expandedMore: [...state.expandedMore], sort: state.sort, pageSize: state.pageSize, basket: state.basket,
@@ -71,7 +72,7 @@ function decodeUserConfig(doc) {
     s = doc.settings;
   } else if (doc.type && doc.type !== "wb_mdm_advq_backup") throw new Error("不是工作台个人配置文件");
   if (!s || !Number.isInteger(s.v) || s.v < 1 || s.v > 8) throw new Error("配置版本无效或暂不支持");
-  const arrayKeys = ["order", "visible", "basket", "expandedMore", "viewShortcuts", "presetViewOrder"];
+  const arrayKeys = ["order", "visible", "basket", "expandedMore", "viewShortcuts", "presetViewOrder", "hiddenShortcutOptions"];
   for (const k of arrayKeys) if (k in s && (!Array.isArray(s[k]) || s[k].some((x) => typeof x !== "string"))) throw new Error(k + " 配置格式不正确");
   if (s.filters && (typeof s.filters !== "object" || Array.isArray(s.filters))) throw new Error("筛选配置格式不正确");
   for (const k of ["mfg", "formula", "cats", "stocks", "brands", "customConditions"]) if (s.filters && k in s.filters && !Array.isArray(s.filters[k])) throw new Error("筛选项 " + k + " 格式不正确");
@@ -116,7 +117,8 @@ function applyUserSettings(s) {
   state.presetViewOrder = stringsOnly(s.presetViewOrder).filter((name) => name !== "工艺属性检查" && Object.prototype.hasOwnProperty.call(DATASET.presets, name));
   const options = new Set(fieldViewOptions().map((o) => o.id));
   state.activeFieldView = options.has(s.activeFieldView) ? s.activeFieldView : Array.isArray(s.visible) ? "" : "preset:日常查料";
-  state.viewShortcuts = (Array.isArray(s.viewShortcuts) ? stringsOnly(s.viewShortcuts) : defaultShortcuts()).filter((k) => options.has(k));
+  state.hiddenShortcutOptions = stringsOnly(s.hiddenShortcutOptions).filter((id) => options.has(id));
+  state.viewShortcuts = (Array.isArray(s.viewShortcuts) ? stringsOnly(s.viewShortcuts) : defaultShortcuts()).filter((k) => options.has(k) && !state.hiddenShortcutOptions.includes(k));
   if (!state.presetViewOrder.length) updatePresetOrderFromShortcuts(state.viewShortcuts);
   state.viewShortcuts = orderPresetShortcuts(state.viewShortcuts);
   state.view = s.view === "card" ? "card" : "table";
@@ -165,7 +167,7 @@ function applyUserSettings(s) {
     for (const k of Object.keys(state[group])) if (k !== "page" && typeof src[k] === typeof state[group][k]) state[group][k] = src[k];
   }
   state.fieldViewDraftName = null;
-  shortcutDraft = null;
+  shortcutDraft = null; hiddenShortcutDraft = null;
 }
 function configDoc(settings) { return { type: CONFIG_FORMAT, schemaVersion: 1, savedAt: new Date().toISOString(), settings }; }
 function cacheConfig(doc, pending) {
@@ -336,18 +338,29 @@ function syncPresetViewControls() {
 function renderShortcutEditor() {
   const el = document.getElementById("fdShortcutOptions"); if (!el) return;
   if (!shortcutDraft) shortcutDraft = [...state.viewShortcuts];
-  const options = fieldViewOptions();
+  if (!hiddenShortcutDraft) hiddenShortcutDraft = new Set(state.hiddenShortcutOptions);
+  const all = fieldViewOptions(), options = all.filter((o) => !hiddenShortcutDraft.has(o.id));
   const arranged = [...shortcutDraft.map((id) => options.find((o) => o.id === id)).filter(Boolean), ...options.filter((o) => !shortcutDraft.includes(o.id))];
   el.innerHTML = arranged.map((o) => {
     const idx = shortcutDraft.indexOf(o.id), on = idx >= 0;
     const id = esc(o.id), name = esc(o.name);
     return '<div class="fd-shortcut-option"><label><input type="checkbox" data-act="shortcut-toggle" data-v="' + id + '"' + (on ? ' checked' : '') + '><span>' + name + '</span><small>' + (o.builtin ? '系统预设' : '我的视图') + '</small></label>'
-      + (on ? '<span class="fd-shortcut-order"><small>' + (idx + 1) + '</small>'
+      + '<span class="fd-shortcut-order">' + (on ? '<small>' + (idx + 1) + '</small>'
         + '<button type="button" class="mini-btn" data-act="shortcut-up" data-v="' + id + '"' + (idx === 0 ? ' disabled' : '') + ' aria-label="上移 ' + name + '">↑</button>'
-        + '<button type="button" class="mini-btn" data-act="shortcut-down" data-v="' + id + '"' + (idx === shortcutDraft.length - 1 ? ' disabled' : '') + ' aria-label="下移 ' + name + '">↓</button>'
-        + '<button type="button" class="mini-btn fd-shortcut-remove" data-act="shortcut-remove" data-v="' + id + '" title="移除快捷入口，保存后生效" aria-label="移除快捷入口：' + name + '">' + ic("x", 12) + '</button></span>' : '') + '</div>';
-  }).join("");
-  const changed = JSON.stringify(shortcutDraft) !== JSON.stringify(state.viewShortcuts);
+        + '<button type="button" class="mini-btn" data-act="shortcut-down" data-v="' + id + '"' + (idx === shortcutDraft.length - 1 ? ' disabled' : '') + ' aria-label="下移 ' + name + '">↓</button>' : '')
+      + '<button type="button" class="mini-btn fd-shortcut-remove" data-act="shortcut-remove" data-v="' + id + '" title="从常用视图配置移除" aria-label="移除常用视图：' + name + '">' + ic("x", 12) + '</button></span></div>';
+  }).join("") || '<p class="fd-shortcut-empty">暂无候选视图，可从「已移除」恢复。</p>';
+  const removed = document.getElementById("fdShortcutRemoved");
+  if (removed) {
+    const items = all.filter((o) => hiddenShortcutDraft.has(o.id));
+    removed.hidden = !items.length;
+    if (!items.length) removed.open = false;
+    document.getElementById("fdShortcutRemovedTitle").textContent = "已移除（" + items.length + "）";
+    document.getElementById("fdShortcutRemovedList").innerHTML = items.map((o) => '<button type="button" class="mini-btn" data-act="shortcut-restore" data-v="' + esc(o.id) + '">恢复 ' + esc(o.name) + '</button>').join("");
+  }
+  const changed = JSON.stringify(shortcutDraft) !== JSON.stringify(state.viewShortcuts)
+    || hiddenShortcutDraft.size !== state.hiddenShortcutOptions.length
+    || state.hiddenShortcutOptions.some((id) => !hiddenShortcutDraft.has(id));
   document.getElementById("fdShortcutStatus").textContent = changed ? "未保存修改" : "已保存 · 按勾选顺序显示";
 }
 function applyFieldView(id) {
